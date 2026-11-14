@@ -1,8 +1,14 @@
 import { test, expect } from "@playwright/test";
+async function signIn(page: import("@playwright/test").Page) {
+  await page.getByLabel("Username").fill("operator");
+  await page.getByLabel("Password").fill(process.env.SNT_BROWSER_PASSWORD!);
+  await page.getByRole("button", { name: "Sign in" }).click();
+}
 test("inspect the incident and record two independent decisions", async ({
   page,
 }) => {
   await page.goto("/");
+  await signIn(page);
   await expect(page.getByText("Online", { exact: true })).toHaveCount(2);
   await page
     .getByRole("link", { name: /Payment Service Performance Regression/ })
@@ -26,12 +32,14 @@ test("inspect the incident and record two independent decisions", async ({
     .nth(1)
     .click();
   await page.reload();
+  await signIn(page);
   await expect(
     page.getByRole("table").getByText("Rejected", { exact: true }),
   ).toBeVisible();
 });
 test("create, retrieve, fault and recover a payment", async ({ page }) => {
   await page.goto("/payflow");
+  await signIn(page);
   const submit = page.getByRole("button", { name: "Submit payment" });
   const receipt = page.getByLabel("Payment response");
   await submit.click();

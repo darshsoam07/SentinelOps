@@ -14,16 +14,17 @@ export async function request<T>(
   body?: unknown,
   acceptFailedPayment = false,
 ): Promise<T> {
-  const res = await fetch(
-    base + path,
-    body === undefined
-      ? {}
-      : {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        },
-  );
+  const headers: Record<string, string> = {};
+  const bearer = token;
+  if (bearer) headers.Authorization = "Bearer " + bearer;
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const url = base + (path === "/health" ? path : "/api/v1" + path);
+  const res = await fetch(url, {
+    headers,
+    method: body === undefined ? "GET" : "POST",
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (res.status === 401 && bearer && bearer === token) setToken("");
   const data = await res.json();
   if (
     !res.ok &&
@@ -60,3 +61,26 @@ export const api = {
   opsHealth: () => request<{ status: string }>(ops, "/health"),
   payHealth: () => request<{ status: string }>(pay, "/health"),
 };
+
+let token = "";
+const listeners = new Set<() => void>();
+export const sessionToken = () => token;
+export const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+};
+export function setToken(value: string) {
+  token = value;
+  listeners.forEach((listener) => listener());
+}
+export async function login(username: string, password: string) {
+  const response = await fetch(ops + "/api/v1/auth/login", {
+    method: "POST",
+    body: new URLSearchParams({ username, password }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw Error(data.detail || "Sign in failed");
+  setToken(data.access_token);
+}

@@ -1,3 +1,4 @@
+import Session from "./Session";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, NavLink, Route, Routes } from "react-router-dom";
 import {
@@ -42,7 +43,6 @@ function App() {
         </div>
       </aside>
       <main>
-
         <div className="content">
           <Routes>
             <Route path="/" element={<Overview />} />
@@ -59,7 +59,8 @@ function App() {
           </Routes>
         </div>
         <footer>
-          Local simulation. Recovery decisions are recorded without executing infrastructure changes.
+          Local simulation. Recovery decisions are recorded without executing
+          infrastructure changes.
         </footer>
       </main>
     </div>
@@ -67,6 +68,8 @@ function App() {
 }
 createRoot(document.getElementById("root")!).render(
   <BrowserRouter>
-    <App />
+    <Session>
+      <App />
+    </Session>
   </BrowserRouter>,
 );

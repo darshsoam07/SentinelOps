@@ -37,7 +37,7 @@ The full workflow runs from observing a failure through detecting and correlatin
 3. Open **Approvals**. Review the rollback, restart and scaling recommendations, then decide one action. Refresh the page and find its action ID in the audit trail. Execution stays unexecuted and the incident remains investigating.
 4. Open **PayFlow lab**. Submit a payment, enable **Database unavailable**, and submit again. Retrieve the failed receipt by ID. Disable the fault and submit once more to observe a successful payment. These requests exercise PayFlow independently of the seeded incident.
 
-[Incident fixture](backend/api/app/seed.py) · [Decision policy](backend/api/app/service.py) · [Payment fault behavior](applications/payflow/payment-service/app/service.py)
+[Incident fixture](backend/api/app/seed.py) · [Decision policy](backend/api/app/services/incidents.py) · [Payment fault behavior](applications/payflow/payment-service/app/services/payments.py)
 
 ## Architecture
 
@@ -150,6 +150,17 @@ npm ci
 test -f .env || cp .env.example .env
 ```
 
+### Configure operator sign-in
+
+From the repository root, run the setup once and choose your operator password.
+
+```bash
+cd ~/sentinelops
+.venv/bin/python scripts/setup-auth.py
+```
+
+The script writes an Argon2 password hash and a random JWT signing secret to a private, Git-ignored file. Source it in **both API terminals** before starting Uvicorn. Sign in at the dashboard as `operator`. Each login lasts 15 minutes. Reloading the dashboard clears its in-memory token.
+
 ## Starting all three applications
 
 Open three Ubuntu terminals.
@@ -160,6 +171,7 @@ Open three Ubuntu terminals.
 cd ~/sentinelops/applications/payflow/payment-service
 
 source ~/sentinelops/.venv/bin/activate
+source ~/sentinelops/.env.auth
 
 uvicorn app.main:app --reload --port 8001
 ```
@@ -170,6 +182,7 @@ uvicorn app.main:app --reload --port 8001
 cd ~/sentinelops/backend/api
 
 source ~/sentinelops/.venv/bin/activate
+source ~/sentinelops/.env.auth
 
 uvicorn app.main:app --reload --port 8000
 ```
@@ -235,6 +248,8 @@ The persistence test uses isolated PostgreSQL schemas and removes its test data 
 The setup script runs `alembic upgrade head` from each API directory using the root virtual environment. Keep the generated connection settings outside Git. [Database setup](scripts/setup-postgres.sh)
 
 ## API reference
+
+Business routes in the tables below are available under `/api/v1` and at their original paths. Both require the same bearer token. Health checks are public. Use the SentinelOps Swagger **Authorize** control or POST form fields `username` and `password` to `/api/v1/auth/login` on port 8000. Send the returned token in `Authorization: Bearer <token>` to either API. `GET /api/v1/users/me` returns the signed-in operator.
 
 ### SentinelOps API — Port 8000
 
@@ -351,14 +366,14 @@ SentinelOps/
 The current application is a local development and demonstration project.
 
 - Do not expose the APIs directly to the public internet.
-- The current approval interface is not an authentication system.
-- Operator identity is a demonstration label.
+- Authentication supports one configured operator.
+- New decisions record the authenticated username. Existing audit records retain their original actor label.
 - Fault switches are process-local.
 - The incident and reliability scenario is seeded.
 - Approved actions are not executed against Kubernetes.
 - Do not use production payment or infrastructure data.
 
-Restricted recovery execution, proper authentication and authorization, and production-grade security controls belong to future milestones.
+Role-based authorization, managed identity and restricted recovery execution are future milestones.
 
 Investigation uses deterministic fixture data and makes no LLM calls. Live OpenTelemetry ingestion, Prometheus, Grafana, Loki and Tempo integration, automatic incident detection and Kubernetes self-healing are pending. Approval records a decision without executing or verifying infrastructure changes.
 

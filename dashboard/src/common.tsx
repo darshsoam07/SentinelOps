@@ -1,25 +1,16 @@
-import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
-export function useResource<T>(read: () => Promise<T>, key = "") {
-  const [data, setData] = useState<T>();
-  const [error, setError] = useState("");
-  const [version, update] = useState(0);
-  useEffect(() => {
-    let current = true;
-    setData(undefined);
-    setError("");
-    read()
-      .then((v) => {
-        if (current) setData(v);
-      })
-      .catch((e) => {
-        if (current) setError(String(e.message));
-      });
-    return () => {
-      current = false;
-    };
-  }, [key, version, read]);
-  return { data, error, refresh: () => update((n) => n + 1), setData };
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ReactNode, SetStateAction } from "react";
+export function useResource<T>(read: () => Promise<T>, key: string) {
+  const client = useQueryClient();
+  const query = useQuery({ queryKey: [key], queryFn: read });
+  return {
+    data: query.data,
+    error: query.error?.message || "",
+    refresh: () => client.invalidateQueries({ queryKey: [key] }),
+    setData: (update: SetStateAction<T | undefined>) => {
+      client.setQueryData<T>([key], update);
+    },
+  };
 }
 export function State({ error, retry }: { error: string; retry: () => void }) {
   return error ? (

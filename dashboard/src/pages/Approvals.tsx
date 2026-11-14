@@ -2,8 +2,8 @@ import { useState } from "react";
 import { api } from "../services/api";
 import { Panel, Badge, State, useResource, utc } from "../common";
 export default function Approvals() {
-  const q = useResource(api.incidents),
-    audit = useResource(api.audit),
+  const q = useResource(api.incidents,"incidents"),
+    audit = useResource(api.audit,"audit"),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
   async function decide(

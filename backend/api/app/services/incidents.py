@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 from fastapi import HTTPException
-from .schemas import Audit, Decision, Event, Incident
-from .seed import seed, stamp
+from app.schemas.incidents import Audit, Decision, Event, Incident
+from app.seed import seed, stamp
 
 ALLOWLIST = {"restart", "rollback", "scale"}
 
@@ -30,13 +30,26 @@ class IncidentStore:
             raise HTTPException(404, "Unknown incident")
         return self.incidents[id]
 
-    def decide(self, id: str, request: Decision, approved: bool) -> Incident:
+    async def list_incidents(self):
+        return list(self.incidents.values())
+
+    async def list_audit(self):
+        return self.audit
+
+    async def detail(self, id):
+        return self.get(id)
+
+    async def decide(
+        self, id: str, request: Decision, approved: bool, actor: str
+    ) -> Incident:
         incident = self.get(id)
-        self.audit.insert(0, incident_decision(incident, request, approved))
+        self.audit.insert(0, incident_decision(incident, request, approved, actor))
         return incident
 
 
-def incident_decision(incident: Incident, request: Decision, approved: bool) -> Audit:
+def incident_decision(
+    incident: Incident, request: Decision, approved: bool, actor: str
+) -> Audit:
     action = next((a for a in incident.actions if a.id == request.action_id), None)
     if action is None:
         raise HTTPException(404, "Unknown action for incident")
@@ -54,7 +67,7 @@ def incident_decision(incident: Incident, request: Decision, approved: bool) -> 
         id=str(uuid4()),
         incident_id=incident.id,
         action=action.id,
-        actor="Local operator",
+        actor=actor,
         time=time,
         decision=action.status,
         execution="Unexecuted",

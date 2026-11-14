@@ -1,18 +1,34 @@
-import os
-from fastapi import FastAPI
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from .routes import router
+from app.core.config import settings
+from app.api.dependencies import current_user
+from app.api.routers.payments import router
+from app.db.database import engine, sessions
 
-app = FastAPI(title="PayFlow")
+
+@asynccontextmanager
+async def lifespan(app):
+    yield
+    if engine:
+        await engine.dispose()
+
+
+app = FastAPI(title="PayFlow", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("DASHBOARD_ORIGINS", "http://localhost:5173").split(","),
+    allow_origins=settings.dashboard_origins.split(","),
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "Authorization"],
 )
-app.include_router(router)
+app.include_router(
+    router, prefix="/api/v1", tags=["Payments"], dependencies=[Depends(current_user)]
+)
+app.include_router(
+    router, include_in_schema=False, dependencies=[Depends(current_user)]
+)
 
 
 @app.get("/health")
-async def health() -> dict[str, str]:
+async def health():
     return {"status": "ok"}

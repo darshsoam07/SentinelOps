@@ -3,7 +3,7 @@ import { Activity, ArrowUpRight } from "lucide-react";
 import { api } from "../services/api";
 import { Panel, State, useResource, Badge, utc } from "../common";
 function Health({ name, read }: { name: string; read: typeof api.opsHealth }) {
-  const check = useResource(read);
+  const check = useResource(read,name);
   return (
     <div className="row">
       <span>{name}</span>
@@ -18,9 +18,9 @@ function Health({ name, read }: { name: string; read: typeof api.opsHealth }) {
   );
 }
 export default function Overview() {
-  const s = useResource(api.summary),
-    incidents = useResource(api.incidents),
-    payments = useResource(api.payments);
+  const s = useResource(api.summary,"summary"),
+    incidents = useResource(api.incidents,"incidents"),
+    payments = useResource(api.payments,"payments");
   const m = s.data;
   return (
     <>

@@ -1,6 +1,9 @@
 """Exercise real HTTP processes twice in disposable PostgreSQL schemas."""
 
 import os
+import secrets
+import jwt
+from datetime import UTC, datetime, timedelta
 import socket
 import subprocess
 import sys
@@ -36,6 +39,8 @@ def database(name, directory):
             env=env,
             check=True,
         )
+        env[variable] = url.render_as_string(hide_password=False)
+        env["PG_TEST_SCHEMA"] = schema
         yield env
     finally:
         with engine.begin() as conn:
@@ -63,7 +68,22 @@ def server(directory, env):
         env=env,
     )
     try:
-        with httpx.Client(base_url=f"http://127.0.0.1:{port}") as client:
+        now = datetime.now(UTC)
+        token = jwt.encode(
+            dict(
+                sub="operator",
+                iss="sentinelops",
+                aud="sentinelops-workspace",
+                iat=now,
+                exp=now + timedelta(minutes=5),
+            ),
+            env["SENTINELOPS_JWT_SECRET"],
+            algorithm="HS256",
+        )
+        with httpx.Client(
+            headers={"Authorization": "Bearer " + token},
+            base_url=f"http://127.0.0.1:{port}",
+        ) as client:
             for _ in range(100):
                 if process.poll() is not None:
                     raise RuntimeError("API exited during startup")
@@ -87,6 +107,9 @@ def main():
     with ExitStack() as stack:
         ops_env = stack.enter_context(database("SENTINELOPS", ops))
         pay_env = stack.enter_context(database("PAYFLOW", pay))
+        ops_env["SENTINELOPS_JWT_SECRET"] = pay_env["SENTINELOPS_JWT_SECRET"] = (
+            secrets.token_hex(32)
+        )
         with server(pay, pay_env) as client:
             response = client.post("/payments", json={"amount": 501, "currency": "INR"})
             assert response.status_code == 201
