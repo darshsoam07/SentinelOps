@@ -159,7 +159,7 @@ cd ~/sentinelops
 .venv/bin/python scripts/setup-auth.py
 ```
 
-The script writes an Argon2 password hash and a random JWT signing secret to a private, Git-ignored file. Source it in **both API terminals** before starting Uvicorn. Sign in at the dashboard as `operator`. Each login lasts 15 minutes. Reloading the dashboard clears its in-memory token.
+The script writes an Argon2 password hash and a random JWT signing secret to a private, Git-ignored file. Source it in **both API terminals** before starting Uvicorn. Sign in at the dashboard as `operator`. Each login lasts 15 minutes. The dashboard keeps the token in localStorage across reloads. Signing out or receiving HTTP 401 clears it and returns the operator to /login.
 
 ## Starting all three applications
 

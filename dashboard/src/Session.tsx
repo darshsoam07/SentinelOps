@@ -1,7 +1,8 @@
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { sessionToken, subscribe, login, setToken } from "./services/api";
+import { Navigate, useLocation } from "react-router-dom";
+import { sessionExpired, sessionToken, subscribe, login, setToken } from "./services/api";
 
 function Workspace({ children }: { children: ReactNode }) {
   const [client] = useState(
@@ -21,12 +22,16 @@ export default function Session({ children }: { children: ReactNode }) {
   const token = useSyncExternalStore(subscribe, sessionToken);
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const {pathname}=useLocation();
+  if (!token && pathname!=="/login") return <Navigate to="/login" replace />;
+  if (token && pathname==="/login") return <Navigate to="/" replace />;
   if (token) return <Workspace key={token}>{children}</Workspace>;
   return (
-    <main className="content">
+    <main className="login-page"><section className="login-panel">
       <h1>Sign in to SentinelOps</h1>
+      {sessionExpired && <p role="status">Your session expired. Sign in again to continue.</p>}
       <form
-        style={{ maxWidth: 400 }}
+
         onSubmit={async (e) => {
           e.preventDefault();
           const form = new FormData(e.currentTarget);
@@ -57,9 +62,9 @@ export default function Session({ children }: { children: ReactNode }) {
             required
           />
         </label>
-        <button disabled={busy}>Sign in</button>
+        <button disabled={busy}>{busy ? "Signing in..." : "Sign in"}</button>
         {error && <p role="alert">{error}</p>}
       </form>
-    </main>
+    </section></main>
   );
 }

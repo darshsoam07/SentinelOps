@@ -32,7 +32,6 @@ test("inspect the incident and record two independent decisions", async ({
     .nth(1)
     .click();
   await page.reload();
-  await signIn(page);
   await expect(
     page.getByRole("table").getByText("Rejected", { exact: true }),
   ).toBeVisible();
@@ -40,6 +39,8 @@ test("inspect the incident and record two independent decisions", async ({
 test("create, retrieve, fault and recover a payment", async ({ page }) => {
   await page.goto("/payflow");
   await signIn(page);
+  await expect(page).toHaveURL(/\/$/);
+  await page.getByRole("link",{name:"PayFlow lab",exact:true}).click();
   const submit = page.getByRole("button", { name: "Submit payment" });
   const receipt = page.getByLabel("Payment response");
   await submit.click();
@@ -56,4 +57,19 @@ test("create, retrieve, fault and recover a payment", async ({ page }) => {
   await expect(fault).not.toBeChecked();
   await submit.click();
   await expect(receipt).toContainText("SUCCESS");
+});
+
+test("a rejected stored token prompts reauthentication and preserves unrelated storage", async ({page})=>{
+ await page.goto("/login");
+ await page.evaluate(()=>{localStorage.setItem("access_token","invalid");localStorage.setItem("preference","keep")});
+ await page.goto("/payflow");
+ await expect(page).toHaveURL(/\/login$/);
+ await expect(page.getByRole("status")).toHaveText(/session expired/i);
+ expect(await page.evaluate(()=>localStorage.getItem("access_token"))).toBeNull();
+ expect(await page.evaluate(()=>localStorage.getItem("preference"))).toBe("keep");
+ await signIn(page);
+ await expect(page.getByRole("heading",{name:"Operations overview"})).toBeVisible();
+ await page.getByRole("button",{name:"Sign out"}).click();
+ await expect(page).toHaveURL(/\/login$/);
+ expect(await page.evaluate(()=>localStorage.getItem("access_token"))).toBeNull();
 });

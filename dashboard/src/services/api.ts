@@ -15,7 +15,7 @@ export async function request<T>(
   acceptFailedPayment = false,
 ): Promise<T> {
   const headers: Record<string, string> = {};
-  const bearer = token;
+  const bearer = sessionToken();
   if (bearer) headers.Authorization = "Bearer " + bearer;
   if (body !== undefined) headers["Content-Type"] = "application/json";
   const url = base + (path === "/health" ? path : "/api/v1" + path);
@@ -24,7 +24,7 @@ export async function request<T>(
     method: body === undefined ? "GET" : "POST",
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (res.status === 401 && bearer && bearer === token) setToken("");
+  if (res.status === 401 && bearer && bearer === sessionToken()) setToken("", true);
   const data = await res.json();
   if (
     !res.ok &&
@@ -62,17 +62,23 @@ export const api = {
   payHealth: () => request<{ status: string }>(pay, "/health"),
 };
 
-let token = "";
+const tokenKey = "access_token";
+export let sessionExpired = false;
 const listeners = new Set<() => void>();
-export const sessionToken = () => token;
+export const sessionToken = () => typeof window === "undefined" ? "" : (window.localStorage.getItem(tokenKey) ?? "");
 export const subscribe = (listener: () => void) => {
   listeners.add(listener);
+  const sync = (event: StorageEvent) => { if (event.key === tokenKey || event.key === null) listener(); };
+  window.addEventListener("storage", sync);
   return () => {
     listeners.delete(listener);
+    window.removeEventListener("storage", sync);
   };
 };
-export function setToken(value: string) {
-  token = value;
+export function setToken(value: string, expired = false) {
+  sessionExpired = expired;
+  if (value) window.localStorage.setItem(tokenKey, value);
+  else window.localStorage.removeItem(tokenKey);
   listeners.forEach((listener) => listener());
 }
 export async function login(username: string, password: string) {
