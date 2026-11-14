@@ -82,7 +82,29 @@ The browser calls each API independently. PostgreSQL mode commits the decision, 
 
 ## Screenshots
 
-**Screenshot placeholders.** Planned captures are the overview, SNT-001 investigation and PayFlow fault response. Their reserved paths are `docs/assets/overview.png`, `docs/assets/investigation.png` and `docs/assets/payflow.png`. Open the running dashboard to inspect these views today.
+### Operations overview
+
+![Operations overview with the critical incident, latency chart, service health and payment activity](docs/assets/overview.png)
+
+Both local APIs are online and PayFlow has recorded one test request. The reliability indicators describe the seeded incident window.
+
+### Incident investigation
+
+![SNT-001 timeline, probable cause, alternative hypotheses, runbooks and supporting evidence](docs/assets/incident-investigation.png)
+
+The SNT-001 timeline places the deployment before the latency increase. The seeded investigation identifies missing query plans and suggests checks for connection pool exhaustion.
+
+### Approvals and audit
+
+![Recovery requests with approve and reject controls above the recorded decision in the audit trail](docs/assets/approvals-audit.png)
+
+The operator approved the rollback recommendation. The audit row records the decision and shows execution as unexecuted. Two other requests await review.
+
+### PayFlow lab
+
+![Test payment form, fault switches, transaction lookup and a successful payment receipt](docs/assets/payflow-lab.png)
+
+A test payment was submitted and retrieved by ID with all three simulated faults switched off.
 
 ## Local setup prerequisites
 
