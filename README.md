@@ -1,155 +1,45 @@
-# SentinelOps
-
-### Cloud Incident Intelligence & Reliability Engineering Workspace
+# SentinelOps — Cloud Incident Intelligence and Reliability Engineering Workspace
 
 **Observe. Investigate. Decide. Recover.**
 
-SentinelOps is a local-first reliability engineering platform built around a simulated payment application called **PayFlow**. It provides an incident investigation dashboard, evidence-backed incident scenarios, an operator approval and audit workflow, and a payment API with controlled fault injection.
-
-The project is being developed toward an AI-assisted Site Reliability Engineering (SRE) platform that can correlate operational signals, investigate probable root causes, recommend recovery actions and verify service restoration.
-
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Optional%20Persistence-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> **Project status:** Local MVP in active development. The current implementation includes a working dashboard, two FastAPI services, optional PostgreSQL persistence and controlled PayFlow fault simulation. Live observability, LLM-based RCA and Kubernetes recovery execution are planned extensions.
+SentinelOps gives an operator one place to investigate a PayFlow payment regression, review a proposed recovery action and see who decided it. The same workspace lets a reviewer send payments to a running API and observe how it responds to controlled faults.
 
----
+> **Current status · Runnable local MVP.** Incident SNT-001 uses seeded evidence. Payment receipts, API health checks, approval decisions and audit entries come from actual HTTP requests. Both services support in-memory operation and optional PostgreSQL persistence.
 
-## 1. The problem
+## Problem statement
 
-Modern cloud-native applications consist of interconnected services. When something fails, engineers often need to inspect several different systems to understand what happened.
+After a payment deployment, slow requests and database timeouts may appear together. An operator needs to establish which observations support a rollback, what evidence is missing and whether anyone has already approved the action.
 
-An incident investigation may involve:
+## Solution and reliability workflow
 
-- Application errors and request latency.
-- CPU and memory utilization.
-- Database connection failures.
-- Kubernetes pod health.
-- Deployment history.
-- Service dependencies.
-- Recovery decisions and audit records.
+The full workflow runs from observing a failure through detecting and correlating signals, investigating a cause, reviewing a recommendation, executing recovery and verifying restoration. Today's entry point is a prepared incident. The operator inspects its evidence, approves or rejects a recommendation, and checks the resulting timeline and audit history.
 
-When this information is fragmented, identifying the probable root cause and restoring service can take longer than necessary.
+## Implemented features
 
-**SentinelOps aims to bring this investigation workflow into one engineering workspace.**
-
-## 2. How SentinelOps works
-
-The intended reliability workflow is:
-
-```text
-       APPLICATION DEPLOYMENT
-                 |
-                 v
-          OBSERVE SYSTEM
-                 |
-                 v
-           DETECT FAILURE
-                 |
-                 v
-         CORRELATE EVENTS
-                 |
-                 v
-        INVESTIGATE CAUSE
-                 |
-                 v
-       RECOMMEND RECOVERY
-                 |
-                 v
-          HUMAN REVIEW
-                 |
-                 v
-       EXECUTE & VERIFY
-                 |
-                 v
-         RECORD OUTCOME
-```
-
-The current MVP implements the incident review, seeded investigation, approval/audit workflow and PayFlow fault simulation portions of this lifecycle.
-
-## 3. Current implemented features
-
-| Capability | What it does | Current status |
-|---|---|---|
-| Operations dashboard | Displays incident information, seeded reliability indicators and service health | Implemented |
-| Incident investigation | Displays SNT-001, its timeline, hypothesis, evidence, alternatives and missing evidence | Implemented with seeded data |
-| Approval workflow | Allows an operator to approve or reject proposed actions | Implemented |
-| Audit trail | Records decisions, actor labels, timestamps and execution state | Implemented |
-| PayFlow API | Creates, lists and retrieves payment transactions | Implemented |
-| Fault simulation | Injects latency, processing errors and simulated database outages | Implemented |
-| PostgreSQL persistence | Persists PayFlow transactions, incidents, decisions and audit history when configured | Implemented |
-
-### Incident investigation: SNT-001
-
-The MVP includes a demonstration incident:
-
-**Payment Service Performance Regression**
-
-Illustrative incident evidence:
-
-| Indicator | Value |
-|---|---:|
-| CPU utilization | 95% |
-| HTTP error rate | 28% |
-| p95 API latency | 4.2 seconds |
-| Pod restarts | 5 |
-
-The investigation screen presents:
-
-- A UTC event timeline.
-- A probable root-cause hypothesis.
-- Supporting evidence references.
-- Alternative explanations.
-- Missing evidence.
-- Suggested investigation steps.
-- Operational runbook recommendations.
-
-The scenario illustrates how a recent deployment could be associated with database connection exhaustion and payment-service performance degradation.
-
-### Recovery policy and audit workflow
-
-Operators can review three proposed action types:
-
-- Restart an unhealthy payment pod.
-- Roll back a deployment.
-- Scale payment replicas.
-
-The current implementation supports approval and rejection decisions, not actual infrastructure execution. Decisions update the action status, add a timeline event and create an audit record.
-
-### PayFlow fault simulation
-
-PayFlow is a separate FastAPI service used to generate controlled application behavior.
-
-| Fault | Simulated behavior |
+| Capability | What a reviewer can verify today |
 |---|---|
-| High latency | Adds 800 ms to payment processing |
-| High error rate | Fails every other eligible request with HTTP 500 |
-| Database unavailable | Returns HTTP 503 |
+| Operations overview | Check both API processes and inspect the seeded latency window alongside counts of actual test payments. |
+| Investigation | Filter incidents and open the UTC timeline, hypothesis, evidence references, alternatives, missing evidence and suggested runbooks. |
+| Decision and audit | Approve or reject an allowlisted action. A second decision returns HTTP 409. The first decision appears in both the timeline and audit trail. |
+| Payment traffic | Submit a positive amount and three-letter uppercase currency. Retrieve the resulting UUID receipt, including failed attempts. |
+| Controlled faults | Add 800 ms of latency, fail the first and every other eligible payment with HTTP 500, or simulate a database outage with HTTP 503. |
+| Persistence | Restart the APIs with PostgreSQL configured and retrieve the original receipt and decision. Each service owns its database and migrations. |
 
-The payment API records failed attempts as well as successful transactions. This makes it possible to inspect the behavior through the dashboard and API.
+## Main demonstration · Payment Service Performance Regression (SNT-001)
 
-## 4. Important implementation boundaries
+1. Open **SNT-001** from Overview. Its seeded deployment timeline begins at 10:20 UTC on 14 November 2026. Detection follows at 10:30 UTC.
+2. Inspect the evidence: 95% CPU, a 28% HTTP error rate, 4.2 seconds p95 latency and five pod restarts. The metrics, logs, trace references and deployment record are seeded. The deterministic investigation links the regression to possible database connection exhaustion and identifies missing query plans.
+3. Open **Approvals**. Review the rollback, restart and scaling recommendations, then decide one action. Refresh the page and find its action ID in the audit trail. Execution stays unexecuted and the incident remains investigating.
+4. Open **PayFlow lab**. Submit a payment, enable **Database unavailable**, and submit again. Retrieve the failed receipt by ID. Disable the fault and submit once more to observe a successful payment. These requests exercise PayFlow independently of the seeded incident.
 
-SentinelOps is under active development. The following distinctions are intentional:
+[Incident fixture](backend/api/app/seed.py) · [Decision policy](backend/api/app/service.py) · [Payment fault behavior](applications/payflow/payment-service/app/service.py)
 
-| Capability | Current behavior |
-|---|---|
-| Incident evidence | Seeded demonstration evidence |
-| Reliability charts | Seeded incident-window metrics and latency values |
-| Root cause analysis | Deterministic seeded investigation; no LLM call yet |
-| Recovery approval | Implemented |
-| Kubernetes recovery execution | Not implemented |
-| Recovery verification | Not implemented |
-| Live Prometheus / Loki / Tempo ingestion | Not implemented |
-| Automatic incident detection | Not implemented |
-
-The project roadmap describes how these capabilities will be developed.
-
-## 5. Architecture
+## Architecture
 
 ```mermaid
 flowchart TB
@@ -170,27 +60,9 @@ flowchart TB
     PS -. optional persistence .-> DB2[(PayFlow PostgreSQL)]
 ```
 
-### Architecture overview
+The browser calls each API independently. PostgreSQL mode commits the decision, timeline change and audit entry in one transaction under a row lock. PayFlow stores each completed payment attempt separately. [Architecture notes](docs/architecture.md) · [Dashboard HTTP client](dashboard/src/services/api.ts)
 
-**Dashboard**
-
-A React and TypeScript application that communicates independently with the SentinelOps API and PayFlow API.
-
-**SentinelOps API**
-
-A FastAPI service responsible for incident records, investigation information, recovery decisions and audit history.
-
-**PayFlow Payment Service**
-
-A separate FastAPI application responsible for payment transactions and controlled fault simulation.
-
-**Persistence**
-
-Each API has its own database configuration, SQLAlchemy engine and Alembic migration history. PostgreSQL persistence is optional; omitting database URLs uses the in-memory demonstration stores.
-
-See [docs/architecture.md](docs/architecture.md) for more implementation details.
-
-## 6. Technology stack
+## Technology stack and responsibility
 
 | Technology | Responsibility |
 |---|---|
@@ -208,9 +80,11 @@ See [docs/architecture.md](docs/architecture.md) for more implementation details
 | Vitest | Frontend unit testing |
 | Playwright | Browser-based end-to-end testing |
 
-## 7. Getting started
+## Screenshots
 
-### Prerequisites
+**Screenshot placeholders.** Planned captures are the overview, SNT-001 investigation and PayFlow fault response. Their reserved paths are `docs/assets/overview.png`, `docs/assets/investigation.png` and `docs/assets/payflow.png`. Open the running dashboard to inspect these views today.
+
+## Local setup prerequisites
 
 - Windows 11 with WSL2 Ubuntu, or a compatible Linux environment.
 - Python 3.11 or newer.
@@ -220,7 +94,9 @@ See [docs/architecture.md](docs/architecture.md) for more implementation details
 
 PostgreSQL is optional for the in-memory demonstration.
 
-### Step 1 — Clone the repository
+## Installation
+
+### Clone the repository
 
 The current Playwright configuration expects the repository at `~/sentinelops`.
 
@@ -252,7 +128,7 @@ npm ci
 test -f .env || cp .env.example .env
 ```
 
-### Step 4 — Start the applications
+## Starting all three applications
 
 Open three Ubuntu terminals.
 
@@ -284,7 +160,7 @@ cd ~/sentinelops/dashboard
 npm run dev
 ```
 
-### Step 5 — Open the application
+## Application URLs
 
 | Component | URL |
 |---|---|
@@ -294,7 +170,7 @@ npm run dev
 | PayFlow API | http://localhost:8001 |
 | PayFlow Swagger docs | http://localhost:8001/docs |
 
-## 8. Optional PostgreSQL persistence
+## Optional PostgreSQL persistence
 
 By default, the applications use their in-memory stores.
 
@@ -334,7 +210,9 @@ python scripts/test-persistence.py
 
 The persistence test uses isolated PostgreSQL schemas and removes its test data afterward.
 
-## 9. API reference
+The setup script runs `alembic upgrade head` from each API directory using the root virtual environment. Keep the generated connection settings outside Git. [Database setup](scripts/setup-postgres.sh)
+
+## API reference
 
 ### SentinelOps API — Port 8000
 
@@ -368,7 +246,7 @@ Approval and rejection request example:
 | GET | `/simulation/faults` | Retrieve fault configuration |
 | POST | `/simulation/faults` | Enable or disable a fault |
 
-## 10. Running tests
+## Running tests
 
 ### Backend tests
 
@@ -394,9 +272,10 @@ npm run build
 
 ### End-to-end browser tests
 
-Install Chromium:
+From the dashboard directory, install Chromium:
 
 ```bash
+cd ~/sentinelops/dashboard
 npx playwright install --with-deps chromium
 ```
 
@@ -409,7 +288,7 @@ env -u SENTINELOPS_DATABASE_URL -u PAYFLOW_DATABASE_URL npm run test:e2e
 
 Playwright starts isolated test services on ports 8100, 8101 and 5174 so that browser tests do not mutate the normal development workspace.
 
-## 11. Repository structure
+## Repository structure
 
 ```text
 SentinelOps/
@@ -445,23 +324,7 @@ SentinelOps/
 └── README.md
 ```
 
-## 12. Development roadmap
-
-The following capabilities are planned extensions, not claims about the current implementation.
-
-| Phase | Planned capability |
-|---|---|
-| Phase 1 | Real observability with Prometheus, Grafana, Loki, Tempo and OpenTelemetry |
-| Phase 2 | Automated incident detection, event correlation and service dependency mapping |
-| Phase 3 | Evidence-based AI root cause analysis and runbook retrieval |
-| Phase 4 | Kubernetes recovery execution with human approval and health verification |
-| Phase 5 | Controlled chaos experiments, resilience testing and incident replay |
-| Phase 6 | Docker, Kubernetes, Helm, GitHub Actions and GitOps |
-| Phase 7 | Terraform-based AWS deployment |
-
-The development priority is to make each capability functional, testable and observable before adding more technologies.
-
-## 13. Security and usage limitations
+## Current limitations and security boundaries
 
 The current application is a local development and demonstration project.
 
@@ -475,7 +338,21 @@ The current application is a local development and demonstration project.
 
 Restricted recovery execution, proper authentication and authorization, and production-grade security controls belong to future milestones.
 
-## 14. Contributing
+Investigation uses deterministic fixture data and makes no LLM calls. Live OpenTelemetry ingestion, Prometheus, Grafana, Loki and Tempo integration, automatic incident detection and Kubernetes self-healing are pending. Approval records a decision without executing or verifying infrastructure changes.
+
+## SentinelOps 2.0 roadmap
+
+| Planned milestone | Engineering outcome |
+|---|---|
+| Container packaging | Run the two APIs, dashboard and databases with Docker Compose. |
+| Observability and SLOs | Instrument PayFlow with OpenTelemetry, collect metrics in Prometheus, logs in Loki and traces in Tempo, and display measured reliability and error budgets in Grafana. |
+| Incident correlation | Detect threshold breaches, group related events and calculate the affected services from a dependency map. |
+| Evidence-based RCA | Collect incident-window evidence, retrieve runbooks and optionally use an LLM to synthesize hypotheses. |
+| Kubernetes recovery | Deploy locally with Helm, execute an approved operation through restricted RBAC and verify recovery before resolving an incident. |
+| Chaos engineering and replay | Run bounded experiments, clean up faults and replay the recorded incident timeline. |
+| Delivery and cloud | Validate changes in GitHub Actions, reconcile deployments with Argo CD and provision an AWS environment with Terraform. |
+
+## Contributing
 
 Contributions and engineering suggestions are welcome.
 
@@ -486,10 +363,6 @@ Before proposing a change:
 3. Add tests for changed behavior.
 4. Update documentation when API contracts or setup instructions change.
 
-## 15. License
+## License
 
-This project is licensed under the [MIT License](LICENSE).
-
----
-
-**SentinelOps — Building toward intelligent, evidence-driven cloud reliability engineering.**
+Licensed under the [MIT License](LICENSE).
