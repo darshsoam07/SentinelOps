@@ -3,7 +3,7 @@ import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { Navigate, useLocation } from "react-router-dom";
-import { sessionExpired, sessionToken, subscribe, login, setToken } from "./services/api";
+import { sessionExpired, sessionToken, subscribe, login } from "./services/api";
 
 function Workspace({ children }: { children: ReactNode }) {
   const [client] = useState(
@@ -12,9 +12,6 @@ function Workspace({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={client}>
       {children}
-      <button className="logout" onClick={() => setToken("")}>
-        Sign out
-      </button>
       {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
     </QueryClientProvider>
   );

@@ -24,7 +24,7 @@ export default function Overview() {
   const m = s.data;
   return (
     <>
-      <h1>Operations overview</h1>
+      <h2>Incident inspector</h2>
       <section className="incident-focus" aria-label="Recent incident activity">
         {incidents.data ? (
           incidents.data.map((i) => (
@@ -46,6 +46,7 @@ export default function Overview() {
           <State error={incidents.error} retry={incidents.refresh} />
         )}
       </section>
+      {incidents.data?.find(i=>i.id==="SNT-001")?.timeline.map((e,index)=><div className="eventline" key={index}><time>{utc(e.time)}</time>{e.title}</div>)}
       {m ? (
         <>
           <h2 className="metric-heading">Reliability indicators <small>Seeded incident window</small></h2>

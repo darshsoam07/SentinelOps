@@ -9,7 +9,8 @@ import {
   ArrowLeftRight,
   Server,
 } from "lucide-react";
-import Overview from "./pages/Overview";
+import SentinelOpsDashboard, {CommandBar} from "./SentinelOpsDashboard";
+import "./command.css";
 import { Incidents, Detail } from "./pages/Incidents";
 import Approvals from "./pages/Approvals";
 import Payflow from "./pages/Payflow";
@@ -42,10 +43,10 @@ function App() {
           Local simulation
         </div>
       </aside>
-      <main>
+      <main><CommandBar/>
         <div className="content">
           <Routes>
-            <Route path="/" element={<Overview />} />
+            <Route path="/" element={<SentinelOpsDashboard />} />
             <Route path="/incidents" element={<Incidents />} />
             <Route path="/incidents/:id" element={<Detail />} />
             <Route path="/approvals" element={<Approvals />} />
