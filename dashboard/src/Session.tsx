@@ -1,3 +1,4 @@
+import {LoginPortal,Credentials} from "./LoginPortal";
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
@@ -27,8 +28,7 @@ export default function Session({ children }: { children: ReactNode }) {
   if (token && pathname==="/login") return <Navigate to="/" replace />;
   if (token) return <Workspace key={token}>{children}</Workspace>;
   return (
-    <main className="login-page"><section className="login-panel">
-      <h1>Sign in to SentinelOps</h1>
+    <LoginPortal>
       {sessionExpired && <p role="status">Your session expired. Sign in again to continue.</p>}
       <form
 
@@ -49,22 +49,9 @@ export default function Session({ children }: { children: ReactNode }) {
           }
         }}
       >
-        <label>
-          Username
-          <input autoComplete="username" name="username" required />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            autoComplete="current-password"
-            name="password"
-            required
-          />
-        </label>
-        <button disabled={busy}>{busy ? "Signing in..." : "Sign in"}</button>
+        <Credentials busy={busy}/>
         {error && <p role="alert">{error}</p>}
       </form>
-    </section></main>
+    </LoginPortal>
   );
 }
