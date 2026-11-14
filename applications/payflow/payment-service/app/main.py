@@ -1,0 +1,18 @@
+import os
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from .routes import router
+
+app = FastAPI(title="PayFlow")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("DASHBOARD_ORIGINS", "http://localhost:5173").split(","),
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+)
+app.include_router(router)
+
+
+@app.get("/health")
+async def health() -> dict[str, str]:
+    return {"status": "ok"}
