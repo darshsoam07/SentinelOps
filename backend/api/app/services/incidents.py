@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from app.schemas.incidents import Audit, Decision, Event, Incident
 from app.seed import seed, stamp
 
-ALLOWLIST = {"restart", "rollback", "scale"}
+ALLOWLIST = {"restart", "rollback", "scale", "clear_database_fault"}
 
 
 class IncidentStore:

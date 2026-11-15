@@ -1,3 +1,4 @@
+import {ThemeSelect} from "./ThemeSelect";
 import {useEffect,useState} from "react";
 import {useQueryClient,useIsFetching} from "@tanstack/react-query";
 import {AudioWaveform} from "lucide-react";
@@ -9,7 +10,7 @@ import {money} from "./ReceiptLedger";
 export function CommandBar(){
  const [now,tick]=useState(()=>new Date()),client=useQueryClient(),pending=useIsFetching();
  useEffect(()=>{const id=setInterval(()=>tick(new Date()),1000);return ()=>clearInterval(id)},[]);
- return <header className="commandbar"><AudioWaveform aria-hidden="true"/><i/><b>SNT-001 // COMMAND PLANE</b><span title="Schema target">OPS DB: 0002 HEAD</span><time>{now.toISOString().slice(11,19)} UTC</time><span>Authenticated operator</span><button disabled={!!pending} onClick={()=>void client.refetchQueries({type:"active"})}>Sync Telemetry</button><button onClick={()=>setToken("")}>Sign out</button></header>
+ return <header className="commandbar"><AudioWaveform aria-hidden="true"/><i/><b>SNT-001 // COMMAND PLANE</b><span title="Schema target">OPS DB: 0002 HEAD</span><ThemeSelect/><time>{now.toISOString().slice(11,19)} UTC</time><span>Authenticated operator</span><button disabled={!!pending} onClick={()=>void client.refetchQueries({type:"active"})}>Sync Telemetry</button><button onClick={()=>setToken("")}>Sign out</button></header>
 }
 export default function SentinelOpsDashboard(){
  const payments=usePayments(),totals=new Map<string,number>();

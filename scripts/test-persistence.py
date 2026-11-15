@@ -1,6 +1,7 @@
 """Exercise real HTTP processes twice in disposable PostgreSQL schemas."""
 
 import os
+import tempfile
 import secrets
 import jwt
 from datetime import UTC, datetime, timedelta
@@ -99,7 +100,7 @@ def database(name, directory):
 
 
 @contextmanager
-def server(directory, env):
+def server(directory, env, signing_file):
     with socket.socket() as reservation:
         reservation.bind(("127.0.0.1", 0))
         port = reservation.getsockname()[1]
@@ -128,8 +129,8 @@ def server(directory, env):
                 iat=now,
                 exp=now + timedelta(minutes=5),
             ),
-            env["SENTINELOPS_JWT_SECRET"],
-            algorithm="HS256",
+            Path(signing_file).read_bytes(),
+            algorithm="EdDSA",
         )
         with httpx.Client(
             headers={"Authorization": "Bearer " + token},
@@ -163,17 +164,22 @@ def main():
     with ExitStack() as stack:
         ops_env = stack.enter_context(database("SENTINELOPS", ops))
         pay_env = stack.enter_context(database("PAYFLOW", pay))
-        ops_env["SENTINELOPS_JWT_SECRET"] = pay_env["SENTINELOPS_JWT_SECRET"] = (
-            secrets.token_hex(32)
+        keys = Path(stack.enter_context(tempfile.TemporaryDirectory())) / "keys"
+        subprocess.run(
+            [sys.executable, ROOT / "scripts/generate-keys.py", keys], check=True
         )
-        with server(pay, pay_env) as client:
+        ops_env["SENTINELOPS_PUBLIC_KEY_FILE"] = pay_env[
+            "SENTINELOPS_PUBLIC_KEY_FILE"
+        ] = str(keys / "public.pem")
+        signing_file = keys / "private.pem"
+        with server(pay, pay_env, signing_file) as client:
             response = client.post("/payments", json={"amount": 501, "currency": "INR"})
             assert response.status_code == 201
             receipt = response.json()
-        with server(pay, pay_env) as client:
+        with server(pay, pay_env, signing_file) as client:
             assert client.get("/payments/" + receipt["id"]).json() == receipt
             assert client.get("/payments?limit=1").json() == [receipt]
-        with server(ops, ops_env) as client:
+        with server(ops, ops_env, signing_file) as client:
 
             def approve(_):
                 return client.post(
@@ -182,13 +188,64 @@ def main():
 
             with ThreadPoolExecutor(2) as pool:
                 assert sorted(pool.map(approve, range(2))) == [200, 409]
-        with server(ops, ops_env) as client:
+        with server(ops, ops_env, signing_file) as client:
             incident = client.get("/incidents/SNT-001").json()
             assert incident["actions"][0]["status"] == "Approved"
             assert incident["timeline"][-1]["kind"] == "Approval"
             assert len(client.get("/audit-logs").json()) == 2
             assert len(client.get("/audit-logs?limit=1").json()) == 1
             assert client.get("/metrics/summary").json()["active"] == 1
+        with tempfile.NamedTemporaryFile(mode="w") as credential:
+            credential.write(secrets.token_hex(32))
+            credential.flush()
+            ops_env["ALERT_TOKEN_FILE"] = credential.name
+            headers = {"Authorization": "Bearer " + Path(credential.name).read_text()}
+            with server(ops, ops_env, signing_file) as client:
+                alert = dict(
+                    fingerprint="integration",
+                    startsAt="2026-01-01T00:00:00Z",
+                    status="firing",
+                    labels={"alertname": "PayFlowPaymentErrors"},
+                )
+                firing_times = []
+                for status in ("firing", "firing", "resolved", "resolved", "firing"):
+                    alert.update(status=status, endsAt="2026-01-01T01:00:00Z")
+                    assert (
+                        client.post(
+                            "/internal/alerts",
+                            headers=headers,
+                            json={"alerts": [alert]},
+                        ).status_code
+                        == 200
+                    )
+                    if status == "firing" and len(firing_times) < 2:
+                        row = next(
+                            i
+                            for i in client.get("/incidents").json()
+                            if i["id"].startswith("ALT-")
+                        )
+                        firing_times.append(row["last_firing_at"])
+                assert firing_times[1] > firing_times[0]
+                episodes = [
+                    i
+                    for i in client.get("/incidents").json()
+                    if i["id"].startswith("ALT-")
+                ]
+                assert len(episodes) == 1 and episodes[0]["status"] == "Resolved"
+                assert (
+                    episodes[0]["resolved_at"]
+                    and episodes[0]["verified_restored_at"] is None
+                )
+                assert (
+                    len(
+                        [
+                            e
+                            for e in client.get("/audit-logs").json()
+                            if e["actor"] == "Alertmanager"
+                        ]
+                    )
+                    == 1
+                )
     print(
         "PASS: migrations, payment restart, concurrent decision, audit and timeline restart"
     )

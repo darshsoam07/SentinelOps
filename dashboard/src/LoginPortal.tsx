@@ -1,3 +1,4 @@
+import {ThemeSelect} from "./ThemeSelect";
 import { useEffect, useState, type ReactNode, type KeyboardEvent } from "react";
 import {
   Activity,
@@ -121,7 +122,7 @@ export function LoginPortal({ children }: { children: ReactNode }) {
       }}
     >
       <div className="portal-inner">
-        <div className="wordmark">
+        <div className="wordmark"><ThemeSelect/>
           <AudioWaveform /> SentinelOps
         </div>
         <div className="portal-split">
@@ -140,7 +141,7 @@ export function LoginPortal({ children }: { children: ReactNode }) {
               <span title="Simulated transport profile">
                 Demo · AES-256-GCM
               </span>
-              <span>JWT HS256</span>
+              <span>JWT Ed25519</span>
               {window.location.hostname === "localhost" &&
                 window.location.port === "5173" && (
                   <span>LOCAL PORT :5173 VERIFIED</span>

@@ -34,6 +34,10 @@ class Action(BaseModel):
     requested_at: datetime
     status: Literal["Pending", "Approved", "Rejected"] = "Pending"
 
+    generation: str | None = None
+    action_started_at: datetime | None = None
+    outcome: Literal["recovered", "persisted", "failed"] | None = None
+
 
 class Incident(BaseModel):
     id: str
@@ -43,6 +47,8 @@ class Incident(BaseModel):
     status: str
     detected_at: datetime
     resolved_at: datetime | None = None
+    last_firing_at: datetime | None = None
+    verified_restored_at: datetime | None = None
     investigation: Investigation
     timeline: list[Event]
     actions: list[Action]

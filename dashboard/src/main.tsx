@@ -14,7 +14,10 @@ import "./command.css";
 import { Incidents, Detail } from "./pages/Incidents";
 import Approvals from "./pages/Approvals";
 import Payflow from "./pages/Payflow";
+import "@fontsource-variable/inter/index.css";
+import "@fontsource-variable/geist-mono/index.css";
 import "./style.css";
+import "./palette.css";
 
 const links = [
   { path: "/", name: "Overview", Icon: LayoutDashboard },
@@ -60,8 +63,7 @@ function App() {
           </Routes>
         </div>
         <footer>
-          Local simulation. Recovery decisions are recorded without executing
-          infrastructure changes.
+          Local simulation. The audit trail records operator decisions and verified fault clearance.
         </footer>
       </main>
     </div>

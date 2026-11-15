@@ -11,6 +11,15 @@ SentinelOps gives an operator one place to investigate a PayFlow payment regress
 
 > **Current status · Runnable local MVP.** Incident SNT-001 uses seeded evidence. Payment receipts, API health checks, approval decisions and audit entries come from actual HTTP requests. Both services support in-memory operation and optional PostgreSQL persistence.
 
+| Feature | Status | Evidence |
+|---|---|---|
+| Operator login with Ed25519 tokens | Implemented | [Signing ADR](docs/decisions/ed25519.md), [auth tests](backend/api/tests/test_auth.py) |
+| Live alerts, episode deduplication and resolution audit | Implemented | [PostgreSQL restart and redelivery test](scripts/test-persistence.py) |
+| Approved clearance of one injected PayFlow database fault | Implemented | [Chromium Compose test](dashboard/compose-tests/recovery.spec.ts), [executor ADR](docs/decisions/recovery.md) |
+| SNT-001 deployment investigation and remediation recommendations | Seeded | [Scenario source](backend/api/app/seed.py) |
+| Detection and restoration trial collection | Implemented | [Measurement method](docs/measurements.md) |
+| Signing-key rotation and token revocation | Planned | [Signing limits](docs/decisions/ed25519.md) |
+
 ## Problem statement
 
 After a payment deployment, slow requests and database timeouts may appear together. An operator needs to establish which observations support a rollback, what evidence is missing and whether anyone has already approved the action.
@@ -159,7 +168,7 @@ cd ~/sentinelops
 .venv/bin/python scripts/setup-auth.py
 ```
 
-The script writes an Argon2 password hash and a random JWT signing secret to a private, Git-ignored file. Source it in **both API terminals** before starting Uvicorn. Sign in at the dashboard as `operator`. Each login lasts 15 minutes. The dashboard keeps the token in localStorage across reloads. Signing out or receiving HTTP 401 clears it and returns the operator to /login.
+The script creates an Ed25519 pair in the ignored .keys directory and writes operator settings to .env.auth. Only SentinelOps needs the signing key. For an existing installation, generate the pair once with `.venv/bin/python scripts/generate-keys.py` and replace the old JWT secret setting with the public and private key file paths. Sign in at the dashboard as `operator`. Each login lasts 15 minutes. The dashboard keeps the token in localStorage across reloads. Signing out or receiving HTTP 401 clears it and returns the operator to /login.
 
 ## Starting all three applications
 
@@ -171,7 +180,7 @@ Open three Ubuntu terminals.
 cd ~/sentinelops/applications/payflow/payment-service
 
 source ~/sentinelops/.venv/bin/activate
-source ~/sentinelops/.env.auth
+export SENTINELOPS_PUBLIC_KEY_FILE=~/sentinelops/.keys/public.pem
 
 uvicorn app.main:app --reload --port 8001
 ```
@@ -373,9 +382,9 @@ The current application is a local development and demonstration project.
 - Approved actions are not executed against Kubernetes.
 - Do not use production payment or infrastructure data.
 
-Role-based authorization, managed identity and restricted recovery execution are future milestones.
+Only the database-fault clearance operation executes. Seeded restart, rollback and scale decisions remain audit-only. Operator lab controls still allow manual fault injection and cleanup.
 
-Investigation uses deterministic fixture data and makes no LLM calls. Live OpenTelemetry ingestion, Prometheus, Grafana, Loki and Tempo integration, automatic incident detection and Kubernetes self-healing are pending. Approval records a decision without executing or verifying infrastructure changes.
+SNT-001 uses deterministic evidence. Compose uses Prometheus for runtime metrics, Grafana for visualization and Alertmanager for incident creation and resolution. See the [three-to-five-minute demo](docs/demo-script.md).
 
 ## SentinelOps 2.0 roadmap
 
@@ -406,13 +415,13 @@ Licensed under the [MIT License](LICENSE).
 
 ## Docker Compose
 
-Create a root `.env` with independent URL-safe `OPS_DB_PASSWORD`, `PAY_DB_PASSWORD`, `ALERT_WEBHOOK_TOKEN` and `GRAFANA_PASSWORD` values (for example, random hex). Run `python scripts/setup-auth.py` if needed. In a private `.env.docker`, copy the three assignments from `.env.auth` without the leading `export ` and single-quote the values to preserve the Argon2 hash. Run:
+Generate the signing pair once with `.venv/bin/python scripts/generate-keys.py` if setup-auth has not already created it. Copy `.env.example` to `.env`. Supply independent random values for the database, Grafana, webhook and executor credentials. Copy the operator name and Argon2 password hash from .env.auth and single-quote the hash in .env to preserve its dollar signs. Both APIs run as non-root and Compose mounts only the public verification key into PayFlow.
 
 ```sh
-docker compose --env-file .env --env-file .env.docker up --build -d
+docker compose up --build -d
 ```
 
-Open http://localhost:8080. Each API migrates its own database before serving requests. Both APIs expose `/health`, `/ready` and Prometheus counters at `/metrics`. Payments and audit lists return the latest 50 records by default (`?limit=1` through `100`). Login allows ten attempts per minute per client address per API process. Both services currently trust the same HS256 key.
+Open http://localhost:8080. Each API migrates its own database before serving requests. Both APIs expose `/health`, `/ready` and Prometheus counters at `/metrics`. Payments and audit lists return the latest 50 records by default (`?limit=1` through `100`). Login allows ten attempts per minute per client address per API process. Only SentinelOps signs operator tokens.
 
 Grafana at http://localhost:3000 provisions the SentinelOps service health dashboard. Prometheus scrapes both APIs every five seconds. The overview reads PayFlow request rate, server error rate and p95 latency from Prometheus. A firing payment-error or high-latency alert creates one incident per fingerprint and firing episode. Local launches without Prometheus use labelled seed data.
 

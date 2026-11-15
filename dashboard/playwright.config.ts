@@ -1,4 +1,7 @@
 import { fileURLToPath } from "node:url";
+import {mkdtempSync, rmSync} from "node:fs";
+import {join} from "node:path";
+import {tmpdir} from "node:os";
 import { randomBytes } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { defineConfig } from "@playwright/test";
@@ -7,7 +10,10 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const password =
   process.env.SNT_BROWSER_PASSWORD || randomBytes(24).toString("hex");
 process.env.SNT_BROWSER_PASSWORD = password;
-const secret = randomBytes(32).toString("hex");
+const temp = mkdtempSync(join(tmpdir(), "sentinel-e2e-"));
+const keys = join(temp, "keys");
+execFileSync(root + "/.venv/bin/python", [root + "/scripts/generate-keys.py", keys]);
+process.on("exit", () => rmSync(temp, {recursive:true, force:true}));
 const hash = execFileSync(
   root + "/.venv/bin/python",
   [
@@ -33,7 +39,8 @@ export default defineConfig({
         SENTINELOPS_DATABASE_URL: "",
         PAYFLOW_DATABASE_URL: "",
         SENTINELOPS_OPERATOR: "operator",
-        SENTINELOPS_JWT_SECRET: secret,
+        SENTINELOPS_PUBLIC_KEY_FILE: join(keys,"public.pem"),
+        SENTINELOPS_PRIVATE_KEY_FILE: port === 8100 ? join(keys,"private.pem") : "",
         SENTINELOPS_PASSWORD_HASH: hash,
         DASHBOARD_ORIGINS: "http://localhost:5174",
       },

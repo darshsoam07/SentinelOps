@@ -16,6 +16,9 @@ async def lifespan(app):
 
 
 app = FastAPI(title="PayFlow", lifespan=lifespan)
+from app.api.routers.recovery import router as recovery_router
+
+app.include_router(recovery_router)
 instrument(app, engine)
 app.add_middleware(
     CORSMiddleware,

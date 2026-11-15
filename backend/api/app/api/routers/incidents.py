@@ -1,6 +1,7 @@
 import os
 from app.services.telemetry import readings
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, BackgroundTasks
+from app.services.recovery import execute
 from app.schemas.incidents import Audit, Decision, Incident, Summary
 from app.seed import METRICS, LATENCY_MS, TIMES
 from app.services.incidents import IncidentStore
@@ -32,10 +33,18 @@ async def detail(id: str, repo=Depends(repository)) -> Incident:
 async def approve(
     id: str,
     request: Decision,
+    background: BackgroundTasks,
     actor: str = Depends(current_user),
     repo=Depends(repository),
 ) -> Incident:
-    return await repo.decide(id, request, True, actor)
+    incident = await repo.decide(id, request, True, actor)
+    if any(
+        a.id == request.action_id and a.operation == "clear_database_fault"
+        for a in incident.actions
+    ):
+        await repo.session.commit()
+        background.add_task(execute, id, request.action_id, actor)
+    return incident
 
 
 @router.post("/incidents/{id}/reject")
@@ -60,7 +69,12 @@ async def summary(repo=Depends(repository)) -> Summary:
     counts = await repo.status_counts()
     resolved = counts.get("Resolved", 0)
     if url := os.getenv("PROMETHEUS_URL"):
-        return Summary(source="Prometheus", active=sum(counts.values()) - resolved, resolved=resolved, **await readings(url))
+        return Summary(
+            source="Prometheus",
+            active=sum(counts.values()) - resolved,
+            resolved=resolved,
+            **await readings(url),
+        )
     return Summary(
         source="Seeded scenario",
         active=sum(counts.values()) - resolved,

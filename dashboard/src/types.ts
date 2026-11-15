@@ -1,4 +1,6 @@
 export interface Action {
+  action_started_at?: string | null;
+  outcome?: "recovered" | "persisted" | "failed" | null;
   id: string;
   operation: string;
   description: string;

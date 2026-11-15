@@ -72,11 +72,11 @@ jobs:
         env:
           SERVICE: ${{ matrix.service }}
           GRAFANA_PASSWORD: build_only
+          RECOVERY_TOKEN: build_only
           ALERT_WEBHOOK_TOKEN: build_only
           OPS_DB_PASSWORD: build_only
           PAY_DB_PASSWORD: build_only
           SENTINELOPS_PASSWORD_HASH: build_only
-          SENTINELOPS_JWT_SECRET: build_only
       - run: docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.76.2 image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed "sentinel-$SERVICE"
         env:
           SERVICE: ${{ matrix.service }}
@@ -93,4 +93,34 @@ jobs:
           node-version: 22
       - run: python -m venv .venv && .venv/bin/pip install ./shared -r backend/api/requirements.txt -r applications/payflow/payment-service/requirements.txt
       - run: npm ci && npx playwright install --with-deps chromium && npm run test:e2e
+        working-directory: dashboard
+  compose-recovery:
+    needs: [backend, dashboard, persistence]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: python -m venv .venv && .venv/bin/pip install ./shared -r backend/api/requirements.txt
+      - name: Provision disposable credentials
+        run: |
+          .venv/bin/python scripts/generate-keys.py
+          .venv/bin/python - <<'PY'
+          from pathlib import Path
+          from secrets import token_hex
+          from pwdlib import PasswordHash
+          import os
+          password = token_hex(24)
+          Path(".env").write_text("\n".join(f"{key}={token_hex(32)}" for key in
+              ["OPS_DB_PASSWORD","PAY_DB_PASSWORD","RECOVERY_TOKEN","ALERT_WEBHOOK_TOKEN","GRAFANA_PASSWORD"])
+              + "\nSENTINELOPS_PASSWORD_HASH='" + PasswordHash.recommended().hash(password) + "'\n")
+          with open(os.environ["GITHUB_ENV"],"a") as env:
+              env.write("SNT_BROWSER_PASSWORD=" + password + "\n")
+          PY
+      - run: docker compose up --build -d
+      - run: npm ci && npx playwright install --with-deps chromium && npx playwright test --config playwright.compose.config.ts
         working-directory: dashboard

@@ -1,3 +1,8 @@
+import os
+
+# Unit tests must never connect to a database inherited from the shell.
+os.environ["SENTINELOPS_DATABASE_URL"] = ""
+
 import pytest
 from fastapi.testclient import TestClient
 from app.api.routers import incidents as routes
