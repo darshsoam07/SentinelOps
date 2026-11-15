@@ -1,3 +1,4 @@
+import {ThemeSelect} from "./ThemeSelect";
 import { useEffect, useState, type ReactNode, type KeyboardEvent } from "react";
 import {
   Activity,
@@ -121,7 +122,7 @@ export function LoginPortal({ children }: { children: ReactNode }) {
       }}
     >
       <div className="portal-inner">
-        <div className="wordmark">
+        <div className="wordmark"><ThemeSelect/>
           <AudioWaveform /> SentinelOps
         </div>
         <div className="portal-split">

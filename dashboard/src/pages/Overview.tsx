@@ -22,6 +22,14 @@ export default function Overview() {
     incidents = useResource(api.incidents,"incidents"),
     payments = useResource(api.payments,"payments");
   const m = s.data;
+  const points = m ? m.latency_ms
+                      .map((v, i) =>
+                        [
+                          (i * 600) / Math.max(1, m.latency_ms.length - 1),
+                          130 - (v * 130) / 5000,
+                        ].join(","),
+                      )
+                      .join(" ") : "";
   return (
     <>
       <h2>Incident inspector</h2>
@@ -64,7 +72,7 @@ export default function Overview() {
               meta={<Badge>{m.source}</Badge>}
             >
               <div className="latency-reading">{m.metrics.find(metric => metric.name === "p95 latency")?.value}<small>95th percentile</small></div>
-              <div className="chart">
+              <div className="chart" data-severity={m.source === "Seeded scenario" ? "critical" : (m.latency_ms.at(-1) ?? 0) > 500 ? "warning" : "baseline"}>
                 <div className="axis">
                   <small>5 s</small>
                   <small>2.5 s</small>
@@ -86,19 +94,14 @@ export default function Overview() {
                       className="gridline"
                     />
                   ))}
+                  <defs><linearGradient id="latency-area" x2="0" y2="1"><stop stopColor="var(--chart-fill)" /><stop offset="1" stopColor="var(--chart-fill)" stopOpacity="0" /></linearGradient></defs>
+                  {points && <polygon points={`0,130 ${points} 600,130`} fill="url(#latency-area)" />}
                   <polyline
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="3"
                     vectorEffect="non-scaling-stroke"
-                    points={m.latency_ms
-                      .map((v, i) =>
-                        [
-                          (i * 600) / Math.max(1, m.latency_ms.length - 1),
-                          130 - (v * 130) / 5000,
-                        ].join(","),
-                      )
-                      .join(" ")}
+                    points={points}
                   />
                 </svg>
               </div>

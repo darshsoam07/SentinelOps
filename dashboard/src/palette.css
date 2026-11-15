@@ -1,0 +1,87 @@
+:root {
+  color-scheme: light dark;
+  --bg: light-dark(#F4F5F7, #090B0E);
+  --surface: light-dark(#FFFFFF, #12151B);
+  --hover: light-dark(#FAFAFA, #1A1E26);
+  --rail: light-dark(#0D0F12, #060709);
+  --cta: light-dark(#111318, #F4F5F7);
+  --cta-text: light-dark(#FFFFFF, #09090B);
+  --pill: light-dark(#F4F4F5, #1E222B);
+  --line: light-dark(#E4E4E7, #232732);
+  --text: light-dark(#09090B, #F8FAFC);
+  --secondary: light-dark(#52525B, #94A3B8);
+  --muted: light-dark(#686F7B, #7C8798);
+  --inactive: light-dark(#A1A1AA, #7C8798);
+  --ai: light-dark(#4F46E5, #818CF8);
+  --cyan: light-dark(#0284C7, #38BDF8);
+  --critical: light-dark(#F43F5E, #FB7185);
+  --critical-text: light-dark(#BE123C, #FDA4AF);
+  --critical-bg: light-dark(#FFE4E6, rgba(244,63,94,.16));
+  --critical-border: light-dark(#FECDD3, rgba(244,63,94,.30));
+  --healthy: light-dark(#10B981, #34D399);
+  --healthy-text: light-dark(#047857, #6EE7B7);
+  --healthy-bg: light-dark(#D1FAE5, rgba(16,185,129,.16));
+  --healthy-border: light-dark(#A7F3D0, rgba(16,185,129,.30));
+  --warning: light-dark(#F59E0B, #FBBF24);
+  --warning-text: light-dark(#B45309, #FDE68A);
+  --warning-bg: light-dark(#FEF3C7, rgba(245,158,11,.16));
+  --warning-border: light-dark(#FDE68A, rgba(245,158,11,.30));
+  --volt: #CCFF00;
+  --brand-gradient: linear-gradient(100deg,#CCFF00 0%,#A3E635 45%,#6366F1 100%);
+  --font: "Inter Variable", sans-serif;
+  --mono: "Geist Mono Variable", monospace;
+  --signal: var(--ai);
+  --wash: var(--pill);
+  --red: var(--critical-text);
+  --redwash: var(--critical-bg);
+  --amber: var(--warning-text);
+}
+:root[data-theme=light] {color-scheme:light}
+:root[data-theme=dark] {color-scheme:dark}
+.shell, .portal {background:var(--bg); color:var(--text); font-family:var(--font)}
+.shell aside {background:var(--rail); color:#F8FAFC}
+.shell aside .brand, .shell aside nav a.active {color:#F8FAFC}
+.shell aside nav a {color:var(--inactive)}
+.shell aside nav a.active {border-color:var(--volt)}
+.shell aside .brand svg {color:var(--volt)}
+.shell .panel,.shell .kpis section,.shell .incident-focus,.shell .commandbar,.portal .bento article,.portal .auth-terminal {
+  background:var(--surface); color:var(--text); border-color:var(--line); box-shadow:none
+}
+.shell .kpis strong,.shell .receipt,.shell .metrics strong {color:var(--text)}
+.shell .eyeline,.dispatch>small,.ledger>small,.shell .subtitle,.portal .auth-terminal p,.portal .module-title,.portal label {color:var(--secondary)}
+.shell .eventline,.shell .row,.shell .ledger article {border-color:var(--line)}
+.shell .kpis small,.eventline time,.receipt time,.portal .log-lines {color:var(--muted)}
+.shell :is(code,time,small,.commandbar,.eventline,.eyeline,.presets button),.portal :is(code,time,small) {font-family:var(--mono)}
+.shell button,.shell input,.shell select,.theme-select {color:var(--text);background:var(--surface);border-color:var(--line)}
+.shell button:hover,.shell .receipt:hover,.shell .incident-row:hover {background:var(--hover)}
+.shell form button:not([type=button]),.shell .buttons button:first-child,.portal .portal-submit {background:var(--cta);color:var(--cta-text);border-color:var(--cta)}
+.shell .badge {color:var(--secondary);background:var(--pill);border:1px solid var(--line)}
+.shell .badge:is(.critical,.high,.offline,.failed,.rejected) {color:var(--critical-text);background:var(--critical-bg);border-color:var(--critical-border)}
+.shell .badge:is(.online,.approved,.success,.verified,.resolved),.shell .ledger .verified {color:var(--healthy-text);background:var(--healthy-bg);border:1px solid var(--healthy-border)}
+.shell .badge:is(.pending,.executing,.investigating,.checking) {color:var(--warning-text);background:var(--warning-bg);border-color:var(--warning-border)}
+.shell .chart,.shell .kpis svg,.portal .spark {color:var(--cyan)}
+.shell .chart polyline {stroke:var(--warning)}
+.shell .gridline {stroke:var(--line)}
+.shell .commandbar i {background:var(--healthy);box-shadow:none}
+.shell .commandbar>b {background:var(--volt);color:#09090B;padding:4px 7px;border-radius:3px}
+.portal {--gold:var(--ai);--mint:var(--healthy-text);--silver:var(--secondary);--mono:"Geist Mono Variable",monospace}
+.portal .showcase h2 {background:none;color:var(--text)}
+.portal .entry,.portal .entry input,.shell pre {background:var(--hover);color:var(--text);border-color:var(--line)}
+.portal .auth-terminal {border-top:3px solid transparent;border-image:var(--brand-gradient) 1}
+.portal .wordmark .theme-select {order:1;margin-inline-start:auto}
+.portal .wordmark svg {background:var(--volt);color:#09090B;border-radius:4px}
+.theme-select {font:12px var(--font);padding:5px;border:1px solid var(--line);border-radius:5px}
+:root {
+  --critical-fill: light-dark(rgba(244,63,94,.22),rgba(251,113,133,.28));
+  --baseline-fill: light-dark(rgba(2,132,199,.15),rgba(56,189,248,.20));
+  --warning-fill: light-dark(rgba(245,158,11,.18),rgba(251,191,36,.22));
+  --critical-area: linear-gradient(180deg,var(--critical-fill),transparent);
+  --baseline-area: linear-gradient(180deg,var(--baseline-fill),transparent);
+  --warning-area: linear-gradient(180deg,var(--warning-fill),transparent);
+}
+.portal .log-lines span,.portal .entry input {color:var(--text)}
+.shell .chart[data-severity=critical] polyline {stroke:var(--critical)}
+.shell .chart[data-severity=critical] {--chart-fill:var(--critical-fill)}
+.shell .chart[data-severity=warning] {--chart-fill:var(--warning-fill)}
+.shell .chart[data-severity=baseline] {--chart-fill:var(--baseline-fill)}
+.shell .chart[data-severity=baseline] polyline {stroke:var(--cyan)}
