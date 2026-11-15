@@ -413,3 +413,7 @@ docker compose --env-file .env --env-file .env.docker up --build -d
 ```
 
 Open http://localhost:8080. Each API migrates its own database before serving requests. Both APIs expose `/health`, `/ready` and Prometheus counters at `/metrics`. Payments and audit lists return the latest 50 records by default (`?limit=1` through `100`). Login allows ten attempts per minute per client address per API process. Both services currently trust the same HS256 key.
+
+In Compose mode set random `ALERT_WEBHOOK_TOKEN` and `GRAFANA_PASSWORD` values in the private root .env. Grafana at http://localhost:3000 provisions the SentinelOps service health dashboard. Prometheus scrapes both APIs every five seconds. The overview reads PayFlow request rate, server error rate and p95 latency from Prometheus. A firing payment-error alert creates one incident per fingerprint and firing episode. Local launches without Prometheus use labelled seed data.
+
+The login limiter uses the ASGI client address, per process, per client address. Multiple workers have independent quotas. Configure Uvicorn's forwarded-header trust only for known reverse proxy addresses. The metrics endpoints are unauthenticated. Keep the API listeners on loopback or a private network and exclude /metrics from public reverse-proxy routes.

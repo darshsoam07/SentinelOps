@@ -71,6 +71,8 @@ jobs:
       - run: docker compose -p sentinel build "$SERVICE"
         env:
           SERVICE: ${{ matrix.service }}
+          GRAFANA_PASSWORD: build_only
+          ALERT_WEBHOOK_TOKEN: build_only
           OPS_DB_PASSWORD: build_only
           PAY_DB_PASSWORD: build_only
           SENTINELOPS_PASSWORD_HASH: build_only

@@ -20,6 +20,32 @@ from sqlalchemy.engine import make_url
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def verify_incident_migration(directory, env, url):
+    def migrate(command, revision):
+        subprocess.run([sys.executable, "-m", "alembic", command, revision],
+                       cwd=directory, env=env, check=True)
+
+    migrate("upgrade", "0001")
+    engine = create_engine(url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(text("""INSERT INTO incidents(id, record) VALUES
+                ('upgrade-fixture', '{"status":"Open","severity":"Low"}')"""))
+        migrate("upgrade", "0002")
+        with engine.begin() as connection:
+            query = text("SELECT status, severity FROM incidents WHERE id='upgrade-fixture'")
+            assert tuple(connection.execute(query).one()) == ("Open", "Low")
+            connection.execute(text("""UPDATE incidents SET record='{"status":"Resolved","severity":"High"}'
+                WHERE id='upgrade-fixture'"""))
+            assert tuple(connection.execute(query).one()) == ("Resolved", "High")
+        migrate("downgrade", "0001")
+        with engine.begin() as connection:
+            assert set(connection.execute(text("SELECT * FROM incidents LIMIT 0")).keys()) == {"id", "record"}
+            assert connection.execute(text("DELETE FROM incidents WHERE id='upgrade-fixture' RETURNING record")).scalar()["status"] == "Resolved"
+    finally:
+        engine.dispose()
+
+
 @contextmanager
 def database(name, directory):
     variable = name + "_DATABASE_URL"
@@ -33,6 +59,8 @@ def database(name, directory):
         env = dict(
             os.environ, **{variable: test_url.render_as_string(hide_password=False)}
         )
+        if name == "SENTINELOPS":
+            verify_incident_migration(directory, env, test_url)
         subprocess.run(
             [sys.executable, "-m", "alembic", "upgrade", "head"],
             cwd=directory,

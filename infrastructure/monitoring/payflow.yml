@@ -1,0 +1,7 @@
+groups:
+  - name: payflow
+    rules:
+      - alert: PayFlowPaymentErrors
+        expr: sum(increase(http_requests_total{job="payflow",route="/api/v1/payments",status=~"5.."}[30s])) > 0
+        labels: {severity: high}
+        annotations: {summary: PayFlow payment requests are failing}

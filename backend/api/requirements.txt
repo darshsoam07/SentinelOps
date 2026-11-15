@@ -13,3 +13,4 @@ pwdlib[argon2]>=0.2,<1
 python-multipart>=0.0.20,<1
 prometheus-client
 slowapi
+httpx>=0.28,<0.29

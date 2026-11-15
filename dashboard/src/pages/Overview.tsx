@@ -49,7 +49,7 @@ export default function Overview() {
       {incidents.data?.find(i=>i.id==="SNT-001")?.timeline.map((e,index)=><div className="eventline" key={index}><time>{utc(e.time)}</time>{e.title}</div>)}
       {m ? (
         <>
-          <h2 className="metric-heading">Reliability indicators <small>Seeded incident window</small></h2>
+          <h2 className="metric-heading">Reliability indicators <small>{m.source}</small></h2>
           <div className="metrics">
             {m.metrics.map((x) => (
               <div key={x.name}>
@@ -61,7 +61,7 @@ export default function Overview() {
           <div className="columns">
             <Panel
               title="Payment latency"
-              meta={<Badge>Seeded scenario</Badge>}
+              meta={<Badge>{m.source}</Badge>}
             >
               <div className="latency-reading">{m.metrics.find(metric => metric.name === "p95 latency")?.value}<small>95th percentile</small></div>
               <div className="chart">
@@ -74,7 +74,7 @@ export default function Overview() {
                   viewBox="0 0 600 130"
                   preserveAspectRatio="none"
                   role="img"
-                  aria-label="Seeded p95 payment latency rising to 4.2 seconds"
+                  aria-label={m.source + " p95 payment latency"}
                 >
                   {[0, 65, 129].map((y) => (
                     <line
@@ -94,7 +94,7 @@ export default function Overview() {
                     points={m.latency_ms
                       .map((v, i) =>
                         [
-                          (i * 600) / (m.latency_ms.length - 1),
+                          (i * 600) / Math.max(1, m.latency_ms.length - 1),
                           130 - (v * 130) / 5000,
                         ].join(","),
                       )

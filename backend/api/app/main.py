@@ -40,6 +40,8 @@ app.include_router(
 app.include_router(
     router, include_in_schema=False, dependencies=[Depends(current_user)]
 )
+from app.api.routers.alerts import router as alerts_router
+app.include_router(alerts_router)
 app.include_router(auth_router, prefix="/api/v1")
 
 

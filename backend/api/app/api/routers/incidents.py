@@ -1,3 +1,5 @@
+import os
+from app.services.telemetry import readings
 from fastapi import APIRouter, Query
 from app.schemas.incidents import Audit, Decision, Incident, Summary
 from app.seed import METRICS, LATENCY_MS, TIMES
@@ -57,6 +59,8 @@ async def audit(
 async def summary(repo=Depends(repository)) -> Summary:
     counts = await repo.status_counts()
     resolved = counts.get("Resolved", 0)
+    if url := os.getenv("PROMETHEUS_URL"):
+        return Summary(source="Prometheus", active=sum(counts.values()) - resolved, resolved=resolved, **await readings(url))
     return Summary(
         source="Seeded scenario",
         active=sum(counts.values()) - resolved,

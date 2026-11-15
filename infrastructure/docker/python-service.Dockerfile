@@ -7,6 +7,7 @@ WORKDIR /srv
 COPY shared /tmp/shared
 COPY ${SERVICE_PATH}/requirements.txt ${SERVICE_PATH}/constraints.txt ./
 RUN pip install --no-cache-dir /tmp/shared -r requirements.txt
+RUN pip uninstall -y wheel setuptools pip && rm -rf /usr/local/lib/python3.12/ensurepip
 COPY ${SERVICE_PATH}/app app
 COPY ${SERVICE_PATH}/alembic alembic
 COPY ${SERVICE_PATH}/alembic.ini .

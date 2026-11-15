@@ -1,7 +1,9 @@
+from time import perf_counter
 from fastapi import HTTPException, Response
 from prometheus_client import (
     CollectorRegistry,
     Counter,
+    Histogram,
     generate_latest,
     CONTENT_TYPE_LATEST,
 )
@@ -12,18 +14,31 @@ from sqlalchemy.exc import SQLAlchemyError
 def instrument(app, engine):
     registry = CollectorRegistry()
     requests = Counter(
-        "http_requests", "Completed HTTP requests", ["status"], registry=registry
+        "http_requests",
+        "Completed HTTP requests",
+        ["route", "status"],
+        registry=registry,
+    )
+
+    duration = Histogram(
+        "http_request_duration_seconds",
+        "Time to response headers",
+        ["route"],
+        registry=registry,
     )
 
     @app.middleware("http")
     async def measure(request, call_next):
+        start = perf_counter()
+        status = 500
         try:
             response = await call_next(request)
-        except Exception:
-            requests.labels("500").inc()
-            raise
-        requests.labels(str(response.status_code)).inc()
-        return response
+            status = response.status_code
+            return response
+        finally:
+            route = getattr(request.scope.get("route"), "path", "unmatched")
+            requests.labels(route, str(status)).inc()
+            duration.labels(route).observe(perf_counter() - start)
 
     @app.get("/ready")
     async def ready():

@@ -17,12 +17,15 @@ services:
       dockerfile: infrastructure/docker/python-service.Dockerfile
       args: { SERVICE_PATH: backend/api }
     environment:
+      PROMETHEUS_URL: http://prometheus:9090
+      ALERT_TOKEN_FILE: /run/secrets/alert_token
       SENTINELOPS_DATABASE_URL: "postgresql+psycopg://sentinelops:${OPS_DB_PASSWORD:?set database password}@ops-db/sentinelops"
       DASHBOARD_ORIGINS: http://localhost:8080
       SENTINELOPS_OPERATOR: "${SENTINELOPS_OPERATOR:-operator}"
       SENTINELOPS_JWT_SECRET: "${SENTINELOPS_JWT_SECRET:?configure authentication}"
       SENTINELOPS_PASSWORD_HASH: "${SENTINELOPS_PASSWORD_HASH:?configure authentication}"
     command: ["sh", "-ec", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    secrets: [alert_token]
     depends_on: { ops-db: { condition: service_healthy } }
     ports: ["127.0.0.1:8000:8000"]
   pay-db:
@@ -58,6 +61,28 @@ services:
         VITE_SENTINELOPS_API_URL: http://localhost:8000
         VITE_PAYFLOW_API_URL: http://localhost:8001
     ports: ["127.0.0.1:8080:8080"]
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infrastructure/monitoring/payflow.yml:/etc/prometheus/payflow.yml:ro
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    secrets: [alert_token]
+    volumes:
+      - ./infrastructure/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+  grafana:
+    image: grafana/grafana:12.1.1
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASSWORD:?set Grafana password}"
+    ports: ["127.0.0.1:3000:3000"]
+    volumes:
+      - ./infrastructure/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infrastructure/monitoring/grafana/dashboards:/etc/grafana/sentinel:ro
+secrets:
+  alert_token:
+    environment: ALERT_WEBHOOK_TOKEN
+
 volumes:
   ops-data: {}
   pay-data: {}
