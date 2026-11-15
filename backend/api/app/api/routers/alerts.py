@@ -41,16 +41,24 @@ async def receive(
     ):
         raise HTTPException(401, "Invalid webhook credential")
     for alert in payload.alerts:
-        if (
-            alert.status != "firing"
-            or alert.labels.get("alertname") != "PayFlowPaymentErrors"
-        ):
+        details = {
+            "PayFlowPaymentErrors": (
+                "PayFlow payment errors",
+                "Payment requests returned server errors.",
+            ),
+            "PayFlowPaymentLatency": (
+                "PayFlow payment latency",
+                "Payment p95 exceeded 500 ms.",
+            ),
+        }.get(alert.labels.get("alertname"))
+        if alert.status != "firing" or details is None:
             continue
+        title, observation = details
         episode = alert.fingerprint + alert.startsAt.astimezone(UTC).isoformat()
         now = datetime.now(UTC)
         incident = Incident(
             id="ALT-" + hashlib.sha256(episode.encode()).hexdigest()[:24],
-            title="PayFlow payment errors",
+            title=title,
             service="PayFlow",
             severity="High",
             status="Investigating",
@@ -61,11 +69,11 @@ async def receive(
                 Event(
                     time=now,
                     kind="Detection",
-                    title="Alertmanager reported payment errors",
+                    title=observation,
                 )
             ],
             investigation=Investigation(
-                hypothesis="Payment requests returned server errors.",
+                hypothesis=observation,
                 confidence="Unconfirmed",
                 alternatives=[],
                 missing=[],
