@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
 
+const ops = process.env.COMPOSE_OPS_URL || "http://localhost:8000/api/v1";
+const pay = process.env.COMPOSE_PAYFLOW_URL || "http://localhost:8001/api/v1";
+
 test("approve a firing database fault and observe verified recovery", async ({ page, request }) => {
   await page.goto("/login");
   await page.getByLabel("Username").fill("operator");
@@ -7,8 +10,6 @@ test("approve a firing database fault and observe verified recovery", async ({ p
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("heading",{name:"Operations overview"})).toBeVisible();
   const headers = {Authorization:"Bearer " + await page.evaluate(()=>localStorage.getItem("access_token"))};
-  const pay = "http://localhost:8001/api/v1";
-  const ops = "http://localhost:8000/api/v1";
   const toggle = (enabled:boolean)=>request.post(pay+"/simulation/faults",{headers,data:{fault:"database_unavailable",enabled}});
   const before = await (await request.get(ops+"/incidents",{headers})).json();
   expect((await toggle(true)).ok()).toBeTruthy();
@@ -34,8 +35,6 @@ test("approve a firing database fault and observe verified recovery", async ({ p
 
 test("record a persisted fault when readiness passes but another fault remains", async ({ request }) => {
   test.setTimeout(180000);
-  const ops = "http://localhost:8000/api/v1";
-  const pay = "http://localhost:8001/api/v1";
   const login = await request.post(ops + "/auth/login", {
     form: { username: "operator", password: process.env.SNT_BROWSER_PASSWORD! },
   });
