@@ -63,6 +63,7 @@ jobs:
     needs: [backend, persistence, dashboard]
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         service: [ops-api, pay-api, dashboard]
     steps:
