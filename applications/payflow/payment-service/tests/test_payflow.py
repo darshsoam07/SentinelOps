@@ -44,3 +44,17 @@ def test_fault(client, fault, expected):
             assert time.monotonic() - start >= 0.8
         if fault == "high_error_rate" and enabled:
             assert client.post("/payments", json=payload).status_code == 201
+
+
+def test_bounded_recent_payments(client):
+    for amount in range(1, 5):
+        assert (
+            client.post(
+                "/payments", json={"amount": amount, "currency": "USD"}
+            ).status_code
+            == 201
+        )
+    assert [p["amount"] for p in client.get("/payments?limit=2").json()] == [4, 3]
+    assert client.get("/payments?limit=101").status_code == 422
+    assert client.get("/ready").json()["storage"] == "memory"
+    assert "http_requests_total" in client.get("/metrics").text

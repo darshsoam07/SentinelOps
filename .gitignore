@@ -12,3 +12,8 @@ playwright-report/
 .env.postgres
 
 .env.auth
+
+.env.docker
+*.egg-info/
+.coverage
+coverage.xml

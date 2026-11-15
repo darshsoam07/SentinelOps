@@ -41,6 +41,9 @@ def database(name, directory):
         )
         env[variable] = url.render_as_string(hide_password=False)
         env["PG_TEST_SCHEMA"] = schema
+        env["PYTHONPATH"] = (
+            str(ROOT / "scripts") + os.pathsep + env.get("PYTHONPATH", "")
+        )
         yield env
     finally:
         with engine.begin() as conn:
@@ -58,7 +61,8 @@ def server(directory, env):
             sys.executable,
             "-m",
             "uvicorn",
-            "app.main:app",
+            "persistence_app:build",
+            "--factory",
             "--port",
             str(port),
             "--log-level",
@@ -95,6 +99,11 @@ def server(directory, env):
                 time.sleep(0.1)
             else:
                 raise RuntimeError("API startup timed out")
+            assert client.get("/ready").json() == {
+                "status": "ready",
+                "storage": "postgresql",
+            }
+            assert "http_requests_total" in client.get("/metrics").text
             yield client
     finally:
         process.terminate()
@@ -116,6 +125,7 @@ def main():
             receipt = response.json()
         with server(pay, pay_env) as client:
             assert client.get("/payments/" + receipt["id"]).json() == receipt
+            assert client.get("/payments?limit=1").json() == [receipt]
         with server(ops, ops_env) as client:
 
             def approve(_):
@@ -130,6 +140,8 @@ def main():
             assert incident["actions"][0]["status"] == "Approved"
             assert incident["timeline"][-1]["kind"] == "Approval"
             assert len(client.get("/audit-logs").json()) == 2
+            assert len(client.get("/audit-logs?limit=1").json()) == 1
+            assert client.get("/metrics/summary").json()["active"] == 1
     print(
         "PASS: migrations, payment restart, concurrent decision, audit and timeline restart"
     )

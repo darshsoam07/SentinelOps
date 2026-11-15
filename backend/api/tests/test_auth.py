@@ -48,3 +48,31 @@ def test_authentication(monkeypatch):
                 ).status_code
                 == 401
             )
+
+
+def test_login_rate_limit(monkeypatch):
+    from app.api.routers.auth import limiter
+
+    limiter.reset()
+    monkeypatch.setattr(
+        settings, "sentinelops_password_hash", SecretStr(hasher.hash("test-password"))
+    )
+    try:
+        with TestClient(app) as client:
+            for _ in range(10):
+                assert (
+                    client.post(
+                        "/api/v1/auth/login",
+                        data={"username": "operator", "password": "wrong"},
+                    ).status_code
+                    == 401
+                )
+            assert (
+                client.post(
+                    "/api/v1/auth/login",
+                    data={"username": "operator", "password": "wrong"},
+                ).status_code
+                == 429
+            )
+    finally:
+        limiter.reset()

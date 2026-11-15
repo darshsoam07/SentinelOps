@@ -1,0 +1,63 @@
+services:
+  ops-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sentinelops
+      POSTGRES_DB: sentinelops
+      POSTGRES_PASSWORD: "${OPS_DB_PASSWORD:?set database password}"
+    volumes: [ops-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "sentinelops"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  ops-api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/python-service.Dockerfile
+      args: { SERVICE_PATH: backend/api }
+    environment:
+      SENTINELOPS_DATABASE_URL: "postgresql+psycopg://sentinelops:${OPS_DB_PASSWORD:?set database password}@ops-db/sentinelops"
+      DASHBOARD_ORIGINS: http://localhost:8080
+      SENTINELOPS_OPERATOR: "${SENTINELOPS_OPERATOR:-operator}"
+      SENTINELOPS_JWT_SECRET: "${SENTINELOPS_JWT_SECRET:?configure authentication}"
+      SENTINELOPS_PASSWORD_HASH: "${SENTINELOPS_PASSWORD_HASH:?configure authentication}"
+    command: ["sh", "-ec", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    depends_on: { ops-db: { condition: service_healthy } }
+    ports: ["127.0.0.1:8000:8000"]
+  pay-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: payflow
+      POSTGRES_DB: payflow
+      POSTGRES_PASSWORD: "${PAY_DB_PASSWORD:?set database password}"
+    volumes: [pay-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "payflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  pay-api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/python-service.Dockerfile
+      args: { SERVICE_PATH: applications/payflow/payment-service }
+    environment:
+      PAYFLOW_DATABASE_URL: "postgresql+psycopg://payflow:${PAY_DB_PASSWORD:?set database password}@pay-db/payflow"
+      DASHBOARD_ORIGINS: http://localhost:8080
+      SENTINELOPS_OPERATOR: "${SENTINELOPS_OPERATOR:-operator}"
+      SENTINELOPS_JWT_SECRET: "${SENTINELOPS_JWT_SECRET:?configure authentication}"
+    command: ["sh", "-ec", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    depends_on: { pay-db: { condition: service_healthy } }
+    ports: ["127.0.0.1:8001:8000"]
+  dashboard:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/dashboard.Dockerfile
+      args:
+        VITE_SENTINELOPS_API_URL: http://localhost:8000
+        VITE_PAYFLOW_API_URL: http://localhost:8001
+    ports: ["127.0.0.1:8080:8080"]
+volumes:
+  ops-data: {}
+  pay-data: {}

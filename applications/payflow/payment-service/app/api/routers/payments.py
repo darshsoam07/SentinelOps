@@ -1,3 +1,5 @@
+from itertools import islice
+from fastapi import Query
 from uuid import UUID
 from fastapi import APIRouter, HTTPException, Response
 from app.schemas.payments import FaultChange, Faults, Payment, PaymentInput
@@ -27,11 +29,13 @@ async def create_payment(
 
 
 @router.get("/payments")
-async def payments(session=Depends(get_db)) -> list[Payment]:
+async def payments(
+    limit: int = Query(50, ge=1, le=100), session=Depends(get_db)
+) -> list[Payment]:
     return (
-        await PaymentRepository(session).recent()
+        await PaymentRepository(session).recent(limit)
         if session
-        else list(reversed(store.records.values()))
+        else list(islice(reversed(store.records.values()), limit))
     )
 
 

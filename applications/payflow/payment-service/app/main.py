@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from sentinelops_common.observability import instrument
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
@@ -15,6 +16,7 @@ async def lifespan(app):
 
 
 app = FastAPI(title="PayFlow", lifespan=lifespan)
+instrument(app, engine)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.dashboard_origins.split(","),

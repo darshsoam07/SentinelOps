@@ -32,3 +32,13 @@ it("surfaces API error detail", async () => {
   );
   await expect(api.payment("missing")).rejects.toThrow("Unknown payment");
 });
+
+it("reports the HTTP status for HTML proxy errors", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("<html>Bad gateway</html>", {status: 502})));
+  await expect(api.audit()).rejects.toThrow("HTTP 502");
+});
+
+it("reports connection failures", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
+  await expect(api.audit()).rejects.toThrow("Cannot reach the API");
+});

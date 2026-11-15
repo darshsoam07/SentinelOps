@@ -43,3 +43,14 @@ def test_policy(client):
     assert (
         client.post(path + "/reject", json={"action_id": "ACT-002"}).status_code == 409
     )
+
+
+def test_audit_limit_and_note(client):
+    result = client.post(
+        "/incidents/SNT-001/approve", json={"action_id": "ACT-001", "note": "Reviewed"}
+    )
+    assert result.status_code == 200
+    audit = client.get("/audit-logs?limit=1").json()
+    assert len(audit) == 1
+    assert audit[0]["note"] == "Reviewed"
+    assert client.get("/audit-logs?limit=0").status_code == 422

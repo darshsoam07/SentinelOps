@@ -6,6 +6,7 @@ export default function Approvals() {
     audit = useResource(api.audit,"audit"),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
+  const [notes, setNotes] = useState<Record<string,string>>({});
   async function decide(
     id: string,
     action: string,
@@ -14,7 +15,7 @@ export default function Approvals() {
     setBusy(true);
     setMessage("");
     try {
-      const updated = await api.decide(id, action, value);
+      const updated = await api.decide(id, action, value, notes[id + "/" + action]);
       q.setData((old) => old?.map((i) => (i.id === id ? updated : i)));
       audit.refresh();
       setMessage(
@@ -52,6 +53,10 @@ export default function Approvals() {
                 <small>
                   {a.risk} risk / Requested {utc(a.requested_at)}
                 </small>
+                {a.status === "Pending" && <label>Decision note (optional)
+                  <input maxLength={500} value={notes[i.id + "/" + a.id] || ""}
+                    onChange={e => setNotes({...notes, [i.id + "/" + a.id]: e.target.value})}/>
+                </label>}
                 <div className="buttons">
                   <button
                     disabled={busy || a.status !== "Pending"}
@@ -87,6 +92,7 @@ export default function Approvals() {
                     "UTC time",
                     "Decision",
                     "Execution",
+                    "Note",
                   ].map((x) => (
                     <th key={x}>{x}</th>
                   ))}
@@ -103,6 +109,7 @@ export default function Approvals() {
                       utc(a.time),
                       a.decision,
                       a.execution,
+                      a.note,
                     ].map((v, n) => (
                       <td key={n}>{v}</td>
                     ))}

@@ -8,6 +8,22 @@ import type {
 } from "../types";
 const ops = import.meta.env.VITE_SENTINELOPS_API_URL || "http://localhost:8000";
 const pay = import.meta.env.VITE_PAYFLOW_API_URL || "http://localhost:8001";
+async function fetchApi(url: string, options: RequestInit) {
+  try {
+    return await fetch(url, options);
+  } catch {
+    throw Error("Cannot reach the API. Check the connection and retry.");
+  }
+}
+
+async function readJson(response: Response) {
+  try {
+    return await response.json();
+  } catch {
+    throw Error("API returned an unreadable response (HTTP " + response.status + ")");
+  }
+}
+
 export async function request<T>(
   base: string,
   path: string,
@@ -19,13 +35,13 @@ export async function request<T>(
   if (bearer) headers.Authorization = "Bearer " + bearer;
   if (body !== undefined) headers["Content-Type"] = "application/json";
   const url = base + (path === "/health" ? path : "/api/v1" + path);
-  const res = await fetch(url, {
+  const res = await fetchApi(url, {
     headers,
     method: body === undefined ? "GET" : "POST",
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (res.status === 401 && bearer && bearer === sessionToken()) setToken("", true);
-  const data = await res.json();
+  const data = await readJson(res);
   if (
     !res.ok &&
     !(acceptFailedPayment && data.status === "FAILED" && data.id)
@@ -44,11 +60,11 @@ export const api = {
     request<Incident>(ops, "/incidents/" + encodeURIComponent(id)),
   summary: () => request<Summary>(ops, "/metrics/summary"),
   audit: () => request<Audit[]>(ops, "/audit-logs"),
-  decide: (id: string, action_id: string, decision: "approve" | "reject") =>
+  decide: (id: string, action_id: string, decision: "approve" | "reject", note?: string) =>
     request<Incident>(
       ops,
       "/incidents/" + encodeURIComponent(id) + "/" + decision,
-      { action_id },
+      { action_id, note },
     ),
   payments: () => request<Payment[]>(pay, "/payments"),
   payment: (id: string) =>
@@ -82,11 +98,11 @@ export function setToken(value: string, expired = false) {
   listeners.forEach((listener) => listener());
 }
 export async function login(username: string, password: string) {
-  const response = await fetch(ops + "/api/v1/auth/login", {
+  const response = await fetchApi(ops + "/api/v1/auth/login", {
     method: "POST",
     body: new URLSearchParams({ username, password }),
   });
-  const data = await response.json();
+  const data = await readJson(response);
   if (!response.ok) throw Error(data.detail || "Sign in failed");
   setToken(data.access_token);
 }

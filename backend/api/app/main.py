@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from sentinelops_common.observability import instrument
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
@@ -20,6 +21,13 @@ async def lifespan(app):
 
 
 app = FastAPI(title="SentinelOps", lifespan=lifespan)
+from app.api.routers.auth import limiter
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+instrument(app, engine)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.dashboard_origins.split(","),

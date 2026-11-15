@@ -11,9 +11,11 @@ class PaymentRepository:
         self.session.add(PaymentRow(**payment.model_dump()))
         await self.session.flush()
 
-    async def recent(self):
+    async def recent(self, limit: int = 50):
         rows = await self.session.scalars(
-            select(PaymentRow).order_by(PaymentRow.created_at.desc(), PaymentRow.id)
+            select(PaymentRow)
+            .order_by(PaymentRow.created_at.desc(), PaymentRow.id)
+            .limit(limit)
         )
         return [Payment.model_validate(row, from_attributes=True) for row in rows]
 

@@ -33,8 +33,13 @@ class IncidentStore:
     async def list_incidents(self):
         return list(self.incidents.values())
 
-    async def list_audit(self):
-        return self.audit
+    async def status_counts(self):
+        from collections import Counter
+
+        return Counter(i.status for i in self.incidents.values())
+
+    async def list_audit(self, limit=50):
+        return self.audit[:limit]
 
     async def detail(self, id):
         return self.get(id)

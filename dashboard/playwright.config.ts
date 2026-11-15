@@ -1,8 +1,9 @@
+import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { defineConfig } from "@playwright/test";
 // Isolated processes keep test decisions and fault toggles out of the operator workspace.
-const root = process.env.HOME + "/sentinelops";
+const root = fileURLToPath(new URL("../", import.meta.url));
 const password =
   process.env.SNT_BROWSER_PASSWORD || randomBytes(24).toString("hex");
 process.env.SNT_BROWSER_PASSWORD = password;

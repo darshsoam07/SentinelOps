@@ -136,7 +136,7 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 
 python -m pip install \
-  -r backend/api/requirements-dev.txt \
+  -e ./shared -r backend/api/requirements-dev.txt \
   -r applications/payflow/payment-service/requirements-dev.txt
 ```
 
@@ -403,3 +403,13 @@ Before proposing a change:
 ## License
 
 Licensed under the [MIT License](LICENSE).
+
+## Docker Compose
+
+Create a root `.env` with separate URL-safe `OPS_DB_PASSWORD` and `PAY_DB_PASSWORD` values (for example, random hex). Run `python scripts/setup-auth.py` if needed. In a private `.env.docker`, copy the three assignments from `.env.auth` without the leading `export ` and single-quote the values to preserve the Argon2 hash. Run:
+
+```sh
+docker compose --env-file .env --env-file .env.docker up --build -d
+```
+
+Open http://localhost:8080. Each API migrates its own database before serving requests. Both APIs expose `/health`, `/ready` and Prometheus counters at `/metrics`. Payments and audit lists return the latest 50 records by default (`?limit=1` through `100`). Login allows ten attempts per minute per client address per API process. Both services currently trust the same HS256 key.

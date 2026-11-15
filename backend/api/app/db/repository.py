@@ -16,7 +16,7 @@ class DatabaseIncidents:
         inserted = (
             await self.session.execute(
                 text(
-                    "INSERT INTO incidents VALUES (:id, CAST(:record AS jsonb)) ON CONFLICT DO NOTHING RETURNING id"
+                    "INSERT INTO incidents(id,record) VALUES (:id, CAST(:record AS jsonb)) ON CONFLICT DO NOTHING RETURNING id"
                 ),
                 dict(id=incident.id, record=incident.model_dump_json()),
             )
@@ -46,12 +46,21 @@ class DatabaseIncidents:
             )
         ]
 
-    async def list_audit(self):
+    async def status_counts(self):
+        rows = await self.session.execute(
+            text("SELECT status, count(*) FROM incidents GROUP BY status")
+        )
+        return dict(rows.all())
+
+    async def list_audit(self, limit=50):
         return [
             Audit.model_validate(r)
             for r in (
                 await self.session.execute(
-                    text("SELECT record FROM audit_events ORDER BY sequence DESC")
+                    text(
+                        "SELECT record FROM audit_events ORDER BY sequence DESC LIMIT :limit"
+                    ),
+                    {"limit": limit},
                 )
             ).scalars()
         ]

@@ -1,6 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from app.schemas.incidents import Audit, Decision, Incident, Summary
-from app.seed import METRICS
+from app.seed import METRICS, LATENCY_MS, TIMES
 from app.services.incidents import IncidentStore
 
 router = APIRouter()
@@ -47,19 +47,21 @@ async def reject(
 
 
 @router.get("/audit-logs")
-async def audit(repo=Depends(repository)) -> list[Audit]:
-    return await repo.list_audit()
+async def audit(
+    limit: int = Query(50, ge=1, le=100), repo=Depends(repository)
+) -> list[Audit]:
+    return await repo.list_audit(limit)
 
 
 @router.get("/metrics/summary")
 async def summary(repo=Depends(repository)) -> Summary:
-    records = await repo.list_incidents()
-    resolved = sum(i.status == "Resolved" for i in records)
+    counts = await repo.status_counts()
+    resolved = counts.get("Resolved", 0)
     return Summary(
         source="Seeded scenario",
-        active=len(records) - resolved,
+        active=sum(counts.values()) - resolved,
         resolved=resolved,
         metrics=METRICS,
-        latency_ms=[180, 210, 195, 260, 480, 930, 1470, 2110, 3070, 3850, 4200],
-        times=[f"10:{i:02}" for i in range(20, 31)],
+        latency_ms=LATENCY_MS,
+        times=TIMES,
     )
