@@ -43,6 +43,7 @@ class Incident(BaseModel):
     status: str
     detected_at: datetime
     resolved_at: datetime | None = None
+    verified_restored_at: datetime | None = None
     investigation: Investigation
     timeline: list[Event]
     actions: list[Action]

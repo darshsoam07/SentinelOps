@@ -1,6 +1,7 @@
 """Exercise real HTTP processes twice in disposable PostgreSQL schemas."""
 
 import os
+import tempfile
 import secrets
 import jwt
 from datetime import UTC, datetime, timedelta
@@ -189,6 +190,48 @@ def main():
             assert len(client.get("/audit-logs").json()) == 2
             assert len(client.get("/audit-logs?limit=1").json()) == 1
             assert client.get("/metrics/summary").json()["active"] == 1
+        with tempfile.NamedTemporaryFile(mode="w") as credential:
+            credential.write(secrets.token_hex(32))
+            credential.flush()
+            ops_env["ALERT_TOKEN_FILE"] = credential.name
+            headers = {"Authorization": "Bearer " + Path(credential.name).read_text()}
+            with server(ops, ops_env) as client:
+                alert = dict(
+                    fingerprint="integration",
+                    startsAt="2026-01-01T00:00:00Z",
+                    status="firing",
+                    labels={"alertname": "PayFlowPaymentErrors"},
+                )
+                for status in ("firing", "firing", "resolved", "resolved", "firing"):
+                    alert.update(status=status, endsAt="2026-01-01T01:00:00Z")
+                    assert (
+                        client.post(
+                            "/internal/alerts",
+                            headers=headers,
+                            json={"alerts": [alert]},
+                        ).status_code
+                        == 200
+                    )
+                episodes = [
+                    i
+                    for i in client.get("/incidents").json()
+                    if i["id"].startswith("ALT-")
+                ]
+                assert len(episodes) == 1 and episodes[0]["status"] == "Resolved"
+                assert (
+                    episodes[0]["resolved_at"]
+                    and episodes[0]["verified_restored_at"] is None
+                )
+                assert (
+                    len(
+                        [
+                            e
+                            for e in client.get("/audit-logs").json()
+                            if e["actor"] == "Alertmanager"
+                        ]
+                    )
+                    == 1
+                )
     print(
         "PASS: migrations, payment restart, concurrent decision, audit and timeline restart"
     )
