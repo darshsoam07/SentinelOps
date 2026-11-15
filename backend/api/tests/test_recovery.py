@@ -80,3 +80,21 @@ def test_approved_execution_states(monkeypatch):
             assert sum(path.endswith("/clear") for path in calls) == 1
 
     asyncio.run(exercise())
+
+
+def test_alert_can_be_recorded_when_payflow_is_unavailable(monkeypatch):
+    from app.services import recovery
+    from datetime import UTC, datetime
+
+    def unavailable(request):
+        return httpx.Response(503)
+
+    monkeypatch.setenv("PAYFLOW_INTERNAL_URL", "http://pay")
+    monkeypatch.setattr(
+        recovery,
+        "client",
+        lambda: httpx.AsyncClient(
+            base_url="http://pay", transport=httpx.MockTransport(unavailable)
+        ),
+    )
+    assert asyncio.run(recovery.proposal(datetime.now(UTC))) == []

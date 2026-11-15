@@ -165,8 +165,12 @@ def main():
         ops_env = stack.enter_context(database("SENTINELOPS", ops))
         pay_env = stack.enter_context(database("PAYFLOW", pay))
         keys = Path(stack.enter_context(tempfile.TemporaryDirectory())) / "keys"
-        subprocess.run([sys.executable, ROOT / "scripts/generate-keys.py", keys], check=True)
-        ops_env["SENTINELOPS_PUBLIC_KEY_FILE"] = pay_env["SENTINELOPS_PUBLIC_KEY_FILE"] = str(keys / "public.pem")
+        subprocess.run(
+            [sys.executable, ROOT / "scripts/generate-keys.py", keys], check=True
+        )
+        ops_env["SENTINELOPS_PUBLIC_KEY_FILE"] = pay_env[
+            "SENTINELOPS_PUBLIC_KEY_FILE"
+        ] = str(keys / "public.pem")
         signing_file = keys / "private.pem"
         with server(pay, pay_env, signing_file) as client:
             response = client.post("/payments", json={"amount": 501, "currency": "INR"})
@@ -203,6 +207,7 @@ def main():
                     status="firing",
                     labels={"alertname": "PayFlowPaymentErrors"},
                 )
+                firing_times = []
                 for status in ("firing", "firing", "resolved", "resolved", "firing"):
                     alert.update(status=status, endsAt="2026-01-01T01:00:00Z")
                     assert (
@@ -213,6 +218,14 @@ def main():
                         ).status_code
                         == 200
                     )
+                    if status == "firing" and len(firing_times) < 2:
+                        row = next(
+                            i
+                            for i in client.get("/incidents").json()
+                            if i["id"].startswith("ALT-")
+                        )
+                        firing_times.append(row["last_firing_at"])
+                assert firing_times[1] > firing_times[0]
                 episodes = [
                     i
                     for i in client.get("/incidents").json()

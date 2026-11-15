@@ -3,7 +3,7 @@
 import argparse
 import os
 import time
-from statistics import mean
+from statistics import median
 
 import httpx
 
@@ -84,7 +84,7 @@ def main():
                 toggle(False)
             if trial + 1 < args.trials:
                 time.sleep(50)  # Clear the 30-second query window and alert group.
-        print(f"{args.fault} MTTD (n={args.trials}): {mean(samples):.2f} s")
+        print(f"{args.fault} median detection time (n={args.trials}): {median(samples):.2f} s")
 
 
 if __name__ == "__main__":

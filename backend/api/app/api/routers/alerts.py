@@ -123,6 +123,7 @@ async def receive(
             severity="High",
             status="Investigating",
             detected_at=now,
+            last_firing_at=now,
             resolved_at=None,
             actions=await recovery.proposal(now)
             if alert.labels.get("alertname") == "PayFlowPaymentErrors"
@@ -146,7 +147,12 @@ async def receive(
         )
         await session.execute(
             text(
-                "INSERT INTO incidents(id,record) VALUES (:id,CAST(:record AS jsonb)) ON CONFLICT(id) DO NOTHING"
+                """INSERT INTO incidents(id,record) VALUES (:id,CAST(:record AS jsonb))
+                ON CONFLICT(id) DO UPDATE
+                SET record = jsonb_set(incidents.record, '{last_firing_at}',
+                    GREATEST(COALESCE(incidents.record->'last_firing_at', 'null'::jsonb),
+                             EXCLUDED.record->'last_firing_at'))
+                WHERE incidents.record->>'resolved_at' IS NULL"""
             ),
             {"id": incident.id, "record": incident.model_dump_json()},
         )

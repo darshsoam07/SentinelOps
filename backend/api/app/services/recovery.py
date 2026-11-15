@@ -21,10 +21,14 @@ def client():
 async def proposal(now):
     if not os.getenv("PAYFLOW_INTERNAL_URL"):
         return []
-    async with client() as pay:
-        response = await pay.get("/internal/recovery/database-fault")
-        response.raise_for_status()
-        generation = response.json()["generation"]
+    try:
+        async with client() as pay:
+            response = await pay.get("/internal/recovery/database-fault")
+            response.raise_for_status()
+            generation = response.json()["generation"]
+    except (httpx.HTTPError, ValueError, KeyError):
+        # Ingestion must still record the alert if PayFlow cannot describe the fault.
+        return []
     if generation is None:
         return []
     return [
