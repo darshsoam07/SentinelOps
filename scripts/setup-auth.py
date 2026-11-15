@@ -3,7 +3,8 @@
 import getpass
 import os
 from pathlib import Path
-import secrets
+import sys
+import subprocess
 import shlex
 from pwdlib import PasswordHash
 
@@ -16,8 +17,11 @@ if len(password) < 12 or password != getpass.getpass("Confirm password: "):
 values = {
     "SENTINELOPS_OPERATOR": "operator",
     "SENTINELOPS_PASSWORD_HASH": PasswordHash.recommended().hash(password),
-    "SENTINELOPS_JWT_SECRET": secrets.token_hex(32),
+    "SENTINELOPS_PRIVATE_KEY_FILE": str(path.parent / ".keys/private.pem"),
+    "SENTINELOPS_PUBLIC_KEY_FILE": str(path.parent / ".keys/public.pem"),
 }
+if not (path.parent / ".keys").exists():
+    subprocess.run([sys.executable, str(path.parent / "scripts/generate-keys.py")], check=True)
 with os.fdopen(
     os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w"
 ) as output:

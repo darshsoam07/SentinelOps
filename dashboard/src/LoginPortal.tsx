@@ -140,7 +140,7 @@ export function LoginPortal({ children }: { children: ReactNode }) {
               <span title="Simulated transport profile">
                 Demo · AES-256-GCM
               </span>
-              <span>JWT HS256</span>
+              <span>JWT Ed25519</span>
               {window.location.hostname === "localhost" &&
                 window.location.port === "5173" && (
                   <span>LOCAL PORT :5173 VERIFIED</span>

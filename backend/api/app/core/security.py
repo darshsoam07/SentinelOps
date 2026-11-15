@@ -1,12 +1,12 @@
 from datetime import UTC, datetime, timedelta
 import jwt
-from sentinelops_common.security import signing_key
+from sentinelops_common.security import key_bytes
 from sentinelops_common.security import verify
 from .config import settings
 
 
 def read_subject(token: str) -> str:
-    return verify(token, settings.sentinelops_jwt_secret, settings.sentinelops_operator)
+    return verify(token, settings.sentinelops_public_key_file, settings.sentinelops_operator)
 
 
 def issue_token(subject):
@@ -19,6 +19,6 @@ def issue_token(subject):
             iss="sentinelops",
             aud="sentinelops-workspace",
         ),
-        signing_key(settings.sentinelops_jwt_secret),
-        algorithm="HS256",
+        key_bytes(settings.sentinelops_private_key_file),
+        algorithm="EdDSA",
     )

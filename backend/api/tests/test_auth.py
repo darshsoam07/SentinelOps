@@ -8,10 +8,27 @@ from app.core.config import settings
 from app.main import app
 
 
-def test_authentication(monkeypatch):
-    key = secrets.token_hex(32)
+def test_authentication(monkeypatch, tmp_path):
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        PrivateFormat,
+        PublicFormat,
+        NoEncryption,
+    )
+
+    key = Ed25519PrivateKey.generate()
+    private = tmp_path / "private.pem"
+    public = tmp_path / "public.pem"
+    private.write_bytes(
+        key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
+    )
+    public.write_bytes(
+        key.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo)
+    )
     password = secrets.token_hex(16)
-    monkeypatch.setattr(settings, "sentinelops_jwt_secret", SecretStr(key))
+    monkeypatch.setattr(settings, "sentinelops_private_key_file", str(private))
+    monkeypatch.setattr(settings, "sentinelops_public_key_file", str(public))
     monkeypatch.setattr(
         settings, "sentinelops_password_hash", SecretStr(hasher.hash(password))
     )
@@ -32,14 +49,18 @@ def test_authentication(monkeypatch):
             "/api/v1/users/me", headers={"Authorization": "Bearer " + token}
         ).json() == {"username": "operator"}
         claims = jwt.decode(
-            token, key, algorithms=["HS256"], audience="sentinelops-workspace"
+            token,
+            key.public_key(),
+            algorithms=["EdDSA"],
+            audience="sentinelops-workspace",
         )
         for invalid in (
             jwt.encode(
                 {**claims, "exp": datetime.now(UTC) - timedelta(seconds=1)},
                 key,
-                algorithm="HS256",
+                algorithm="EdDSA",
             ),
+            jwt.encode(claims, Ed25519PrivateKey.generate(), algorithm="EdDSA"),
             jwt.encode(claims, secrets.token_hex(32), algorithm="HS256"),
         ):
             assert (

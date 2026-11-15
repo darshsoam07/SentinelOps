@@ -1,19 +1,22 @@
+from pathlib import Path
+
 import jwt
 from fastapi import HTTPException
 
 
-def signing_key(secret):
-    if not secret or len(secret.get_secret_value().encode()) < 32:
-        raise HTTPException(503, "Configure operator authentication")
-    return secret.get_secret_value()
+def key_bytes(path):
+    try:
+        return Path(path).read_bytes()
+    except (TypeError, OSError) as exc:
+        raise HTTPException(503, "Configure operator authentication") from exc
 
 
-def verify(token: str, secret, operator: str) -> str:
+def verify(token: str, public_key_file, operator: str) -> str:
     try:
         claims = jwt.decode(
             token,
-            signing_key(secret),
-            algorithms=["HS256"],
+            key_bytes(public_key_file),
+            algorithms=["EdDSA"],
             issuer="sentinelops",
             audience="sentinelops-workspace",
             options={"require": ["exp", "iat", "sub"]},

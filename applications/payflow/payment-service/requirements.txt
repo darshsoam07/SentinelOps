@@ -8,5 +8,5 @@ psycopg[binary]>=3.2,<4
 
 asyncpg>=0.30,<1
 pydantic-settings>=2,<3
-PyJWT>=2.10,<3
+PyJWT[crypto]>=2.10,<3
 prometheus-client

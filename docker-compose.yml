@@ -22,10 +22,11 @@ services:
       SENTINELOPS_DATABASE_URL: "postgresql+psycopg://sentinelops:${OPS_DB_PASSWORD:?set database password}@ops-db/sentinelops"
       DASHBOARD_ORIGINS: http://localhost:8080
       SENTINELOPS_OPERATOR: "${SENTINELOPS_OPERATOR:-operator}"
-      SENTINELOPS_JWT_SECRET: "${SENTINELOPS_JWT_SECRET:?configure authentication}"
+      SENTINELOPS_PUBLIC_KEY_FILE: /run/secrets/jwt_public
+      SENTINELOPS_PRIVATE_KEY_FILE: /run/secrets/jwt_private
       SENTINELOPS_PASSWORD_HASH: "${SENTINELOPS_PASSWORD_HASH:?configure authentication}"
     command: ["sh", "-ec", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
-    secrets: [alert_token]
+    secrets: [alert_token, jwt_private, jwt_public]
     depends_on: { ops-db: { condition: service_healthy } }
     ports: ["127.0.0.1:8000:8000"]
   pay-db:
@@ -49,8 +50,9 @@ services:
       PAYFLOW_DATABASE_URL: "postgresql+psycopg://payflow:${PAY_DB_PASSWORD:?set database password}@pay-db/payflow"
       DASHBOARD_ORIGINS: http://localhost:8080
       SENTINELOPS_OPERATOR: "${SENTINELOPS_OPERATOR:-operator}"
-      SENTINELOPS_JWT_SECRET: "${SENTINELOPS_JWT_SECRET:?configure authentication}"
+      SENTINELOPS_PUBLIC_KEY_FILE: /run/secrets/jwt_public
     command: ["sh", "-ec", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    secrets: [jwt_public]
     depends_on: { pay-db: { condition: service_healthy } }
     ports: ["127.0.0.1:8001:8000"]
   dashboard:
@@ -82,6 +84,10 @@ services:
       - ./infrastructure/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./infrastructure/monitoring/grafana/dashboards:/etc/grafana/sentinel:ro
 secrets:
+  jwt_private:
+    file: ./.keys/private.pem
+  jwt_public:
+    file: ./.keys/public.pem
   alert_token:
     environment: ALERT_WEBHOOK_TOKEN
 

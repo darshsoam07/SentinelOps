@@ -100,7 +100,7 @@ def database(name, directory):
 
 
 @contextmanager
-def server(directory, env):
+def server(directory, env, signing_file):
     with socket.socket() as reservation:
         reservation.bind(("127.0.0.1", 0))
         port = reservation.getsockname()[1]
@@ -129,8 +129,8 @@ def server(directory, env):
                 iat=now,
                 exp=now + timedelta(minutes=5),
             ),
-            env["SENTINELOPS_JWT_SECRET"],
-            algorithm="HS256",
+            Path(signing_file).read_bytes(),
+            algorithm="EdDSA",
         )
         with httpx.Client(
             headers={"Authorization": "Bearer " + token},
@@ -164,17 +164,18 @@ def main():
     with ExitStack() as stack:
         ops_env = stack.enter_context(database("SENTINELOPS", ops))
         pay_env = stack.enter_context(database("PAYFLOW", pay))
-        ops_env["SENTINELOPS_JWT_SECRET"] = pay_env["SENTINELOPS_JWT_SECRET"] = (
-            secrets.token_hex(32)
-        )
-        with server(pay, pay_env) as client:
+        keys = Path(stack.enter_context(tempfile.TemporaryDirectory())) / "keys"
+        subprocess.run([sys.executable, ROOT / "scripts/generate-keys.py", keys], check=True)
+        ops_env["SENTINELOPS_PUBLIC_KEY_FILE"] = pay_env["SENTINELOPS_PUBLIC_KEY_FILE"] = str(keys / "public.pem")
+        signing_file = keys / "private.pem"
+        with server(pay, pay_env, signing_file) as client:
             response = client.post("/payments", json={"amount": 501, "currency": "INR"})
             assert response.status_code == 201
             receipt = response.json()
-        with server(pay, pay_env) as client:
+        with server(pay, pay_env, signing_file) as client:
             assert client.get("/payments/" + receipt["id"]).json() == receipt
             assert client.get("/payments?limit=1").json() == [receipt]
-        with server(ops, ops_env) as client:
+        with server(ops, ops_env, signing_file) as client:
 
             def approve(_):
                 return client.post(
@@ -183,7 +184,7 @@ def main():
 
             with ThreadPoolExecutor(2) as pool:
                 assert sorted(pool.map(approve, range(2))) == [200, 409]
-        with server(ops, ops_env) as client:
+        with server(ops, ops_env, signing_file) as client:
             incident = client.get("/incidents/SNT-001").json()
             assert incident["actions"][0]["status"] == "Approved"
             assert incident["timeline"][-1]["kind"] == "Approval"
@@ -195,7 +196,7 @@ def main():
             credential.flush()
             ops_env["ALERT_TOKEN_FILE"] = credential.name
             headers = {"Authorization": "Bearer " + Path(credential.name).read_text()}
-            with server(ops, ops_env) as client:
+            with server(ops, ops_env, signing_file) as client:
                 alert = dict(
                     fingerprint="integration",
                     startsAt="2026-01-01T00:00:00Z",
