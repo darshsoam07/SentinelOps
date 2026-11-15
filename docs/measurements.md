@@ -13,3 +13,15 @@ The load generator records fault_acknowledged_at when the enable call returns an
 MTTD is client-observed elapsed time from fault acknowledgment to reading the incident. MTTR here is client-observed elapsed time from fault acknowledgment to reading both resolution and verified restoration. Both use the same monotonic clock and include polling delay. UTC timestamps are descriptive and can differ across hosts. Measurement trials use manual cleanup. Use the separate Chromium lifecycle test to assess operator approval and execution.
 
 JSON contains per-trial timestamps, counts, median, minimum and maximum, host platform, UTC date, source revision and monitoring intervals. Results apply to this local workload. [Measurement decision](decisions/measurements.md)
+
+## Observed Compose trials
+
+Measured application revision `be20ba8`. All 30 trials produced distinct incidents with separate resolution and verification timestamps. These trials used manual cleanup.
+
+| Fault | n | Detection seconds, median (min–max) | Restoration seconds, median (min–max) |
+|---|---:|---:|---:|
+| database_unavailable | 10 | 10.34 (8.31–11.42) | 49.97 (47.95–50.39) |
+| high_latency | 10 | 10.07 (9.99–11.90) | 49.74 (48.78–54.83) |
+| high_error_rate | 10 | 11.39 (10.35–15.55) | 50.03 (48.99–55.36) |
+
+[Machine-readable samples and run configuration](measurements/compose-trials.json)
