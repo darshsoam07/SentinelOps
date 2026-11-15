@@ -69,3 +69,22 @@ def test_receipt_metrics_use_route_template(client):
     assert 'route="/payments/{id}"' in metrics
     assert unknown not in metrics
     assert "http_request_duration_seconds_bucket" in metrics
+
+
+def test_recovery_rejects_old_generation(client, monkeypatch):
+    monkeypatch.setenv("RECOVERY_TOKEN", "test-scope")
+    headers = {"Authorization": "Bearer test-scope"}
+    path = "/internal/recovery/database-fault"
+    assert client.get(path).status_code == 401
+    for enabled in [True, False, True]:
+        client.post(
+            "/simulation/faults",
+            json={"fault": "database_unavailable", "enabled": enabled},
+        ).raise_for_status()
+        if enabled:
+            current = client.get(path, headers=headers).json()["generation"]
+            if "first" not in locals():
+                first = current
+    assert client.post(f"{path}/{first}/clear", headers=headers).status_code == 409
+    assert client.post(f"{path}/{current}/clear", headers=headers).status_code == 200
+    assert client.post(f"{path}/{current}/clear", headers=headers).status_code == 409
