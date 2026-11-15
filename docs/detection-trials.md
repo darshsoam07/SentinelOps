@@ -2,11 +2,11 @@
 
 On 15 November 2026 the local Docker Desktop stack ran both FastAPI services, separate PostgreSQL 16 databases, Prometheus and Alertmanager. The load generator ran in WSL and used the authenticated PayFlow API. Each trial enabled one simulation switch. The database-unavailable switch returns HTTP 503 while the database itself continues running.
 
-| Fault | Trials | Time to incident (seconds) | Mean (seconds) |
-| --- | ---: | --- | ---: |
-| Database unavailable | 3 | 17.41, 10.21, 10.22 | 12.62 |
-| High latency (800 ms injected) | 1 | 8.11 | — |
-| High error rate (alternating HTTP 500 and 201) | 1 | 13.28 | — |
+| Fault | Trials | Time to incident (seconds) |
+| --- | ---: | --- |
+| Database unavailable | 3 | 17.41, 10.21, 10.22 |
+| High latency (800 ms injected) | 1 | 8.11 |
+| High error rate (alternating HTTP 500 and 201) | 1 | 13.28 |
 
 The clock starts on the load generator when the enable request returns successfully. It stops when the same process first reads a new incident for the expected alert through the SentinelOps API. It uses Python's monotonic clock. Each loop submits a one-dollar demo payment, checks for the incident, then waits one second. Detection time includes request handling, scrape and evaluation timing, webhook delivery, database commit and polling delay.
 

@@ -1,0 +1,2 @@
+# Measure operator-visible recovery
+Use a monotonic clock at one client for elapsed times. Keep the server and Alertmanager UTC timestamps to explain where the delay occurred. Correlate by a new incident ID and require verified resolution before repeating an injection. Report counts and the sample distribution per fault type. Manual cleanup gives a repeatable stimulus; human approval timing is exercised independently in the Compose lifecycle test.

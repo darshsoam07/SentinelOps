@@ -60,8 +60,7 @@ function App() {
           </Routes>
         </div>
         <footer>
-          Local simulation. Recovery decisions are recorded without executing
-          infrastructure changes.
+          Local simulation. The audit trail records operator decisions and verified fault clearance.
         </footer>
       </main>
     </div>
