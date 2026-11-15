@@ -5,7 +5,9 @@ import httpx
 from fastapi import HTTPException
 
 RATE = 'sum(rate(http_requests_total{job="payflow",route="/payments"}[1m]))'
-ERRORS = 'sum(rate(http_requests_total{job="payflow",route="/payments",status=~"5.."}[1m]))'
+ERRORS = (
+    'sum(rate(http_requests_total{job="payflow",route="/payments",status=~"5.."}[1m]))'
+)
 P95 = 'histogram_quantile(0.95,sum by(le)(rate(http_request_duration_seconds_bucket{job="payflow",route="/payments"}[1m])))'
 
 

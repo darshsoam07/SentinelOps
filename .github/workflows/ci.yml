@@ -72,6 +72,7 @@ jobs:
         env:
           SERVICE: ${{ matrix.service }}
           GRAFANA_PASSWORD: build_only
+          RECOVERY_TOKEN: build_only
           ALERT_WEBHOOK_TOKEN: build_only
           OPS_DB_PASSWORD: build_only
           PAY_DB_PASSWORD: build_only

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { Panel, Badge, State, useResource, utc } from "../common";
 export default function Approvals() {
@@ -7,6 +7,12 @@ export default function Approvals() {
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
   const [notes, setNotes] = useState<Record<string,string>>({});
+  const awaitingRecovery = q.data?.some(i => i.actions.some(a => a.operation === "clear_database_fault" && a.status === "Approved" && !a.outcome));
+  useEffect(() => {
+    if (!awaitingRecovery) return;
+    const timer = window.setInterval(() => { q.refresh(); audit.refresh(); }, 1000);
+    return () => window.clearInterval(timer);
+  }, [awaitingRecovery, q.refresh, audit.refresh]);
   async function decide(
     id: string,
     action: string,
@@ -46,7 +52,7 @@ export default function Approvals() {
                   <small>
                     {a.id} / {i.id} / {i.service}
                   </small>
-                  <Badge>{a.status}</Badge>
+                  <Badge>{a.outcome === "recovered" ? "Verified" : a.outcome ? "Failed (" + a.outcome + ")" : a.action_started_at ? "Executing" : a.status}</Badge>
                 </div>
                 <h3>{a.description}</h3>
                 <p>{a.reason}</p>

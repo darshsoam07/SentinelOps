@@ -8,6 +8,7 @@ class PaymentStore:
     """Single-event-loop repository. Each request uses the fault snapshot at arrival."""
 
     def __init__(self):
+        self.database_generation = None
         self.records = {}
         self.faults = Faults()
         self.error_attempts = 0
@@ -18,6 +19,11 @@ class PaymentStore:
             and change.enabled != self.faults.high_error_rate
         ):
             self.error_attempts = 0
+        if (
+            change.fault == "database_unavailable"
+            and self.faults.database_unavailable != change.enabled
+        ):
+            self.database_generation = uuid4() if change.enabled else None
         setattr(self.faults, change.fault, change.enabled)
         return self.faults
 

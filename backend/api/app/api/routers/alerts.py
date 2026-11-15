@@ -1,3 +1,5 @@
+from app.services import recovery
+import httpx
 import hashlib
 import os
 import secrets
@@ -78,6 +80,15 @@ async def receive(
             if existing.resolved_at is None:
                 existing.resolved_at = alert.endsAt.astimezone(UTC)
                 existing.status = "Resolved"
+                if not existing.verified_restored_at and os.getenv(
+                    "PAYFLOW_INTERNAL_URL"
+                ):
+                    try:
+                        async with recovery.client() as pay:
+                            if await recovery.verify(pay):
+                                existing.verified_restored_at = datetime.now(UTC)
+                    except (httpx.HTTPError, ValueError, KeyError):
+                        pass
                 existing.timeline.append(
                     Event(
                         time=now,
@@ -99,7 +110,9 @@ async def receive(
                         actor="Alertmanager",
                         time=now,
                         decision="Resolved",
-                        execution="Unverified",
+                        execution="Verified"
+                        if existing.verified_restored_at
+                        else "Unverified",
                     )
                 )
             continue
@@ -111,7 +124,9 @@ async def receive(
             status="Investigating",
             detected_at=now,
             resolved_at=None,
-            actions=[],
+            actions=await recovery.proposal(now)
+            if alert.labels.get("alertname") == "PayFlowPaymentErrors"
+            else [],
             timeline=[
                 Event(
                     time=now,

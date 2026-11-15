@@ -75,6 +75,20 @@ class DatabaseIncidents:
             raise HTTPException(404, "Unknown incident")
         return Incident.model_validate(record)
 
+    async def save(self, incident):
+        await self.session.execute(
+            text("UPDATE incidents SET record=CAST(:record AS jsonb) WHERE id=:id"),
+            {"id": incident.id, "record": incident.model_dump_json()},
+        )
+
+    async def lock(self, id):
+        record = await self.session.scalar(
+            text("SELECT record FROM incidents WHERE id=:id FOR UPDATE"), {"id": id}
+        )
+        if record is None:
+            raise HTTPException(404, "Unknown incident")
+        return Incident.model_validate(record)
+
     async def decide(self, id, request, approved, actor):
         record = (
             await self.session.execute(

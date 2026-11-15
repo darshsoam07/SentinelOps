@@ -17,11 +17,13 @@ services:
       dockerfile: infrastructure/docker/python-service.Dockerfile
       args: { SERVICE_PATH: backend/api }
     environment:
+      PAYFLOW_INTERNAL_URL: http://pay-api:8000
       PROMETHEUS_URL: http://prometheus:9090
       ALERT_TOKEN_FILE: /run/secrets/alert_token
       SENTINELOPS_DATABASE_URL: "postgresql+psycopg://sentinelops:${OPS_DB_PASSWORD:?set database password}@ops-db/sentinelops"
       DASHBOARD_ORIGINS: http://localhost:8080
       SENTINELOPS_OPERATOR: "${SENTINELOPS_OPERATOR:-operator}"
+      RECOVERY_TOKEN: "${RECOVERY_TOKEN:?configure recovery credential}"
       SENTINELOPS_PUBLIC_KEY_FILE: /run/secrets/jwt_public
       SENTINELOPS_PRIVATE_KEY_FILE: /run/secrets/jwt_private
       SENTINELOPS_PASSWORD_HASH: "${SENTINELOPS_PASSWORD_HASH:?configure authentication}"
@@ -50,6 +52,7 @@ services:
       PAYFLOW_DATABASE_URL: "postgresql+psycopg://payflow:${PAY_DB_PASSWORD:?set database password}@pay-db/payflow"
       DASHBOARD_ORIGINS: http://localhost:8080
       SENTINELOPS_OPERATOR: "${SENTINELOPS_OPERATOR:-operator}"
+      RECOVERY_TOKEN: "${RECOVERY_TOKEN:?configure recovery credential}"
       SENTINELOPS_PUBLIC_KEY_FILE: /run/secrets/jwt_public
     command: ["sh", "-ec", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
     secrets: [jwt_public]
