@@ -43,6 +43,8 @@ class Incident(BaseModel):
     status: str
     detected_at: datetime
     resolved_at: datetime | None = None
+    verified_restored_at: datetime | None = None
+    evidence_source: str = "none"
     investigation: Investigation
     timeline: list[Event]
     actions: list[Action]
@@ -76,3 +78,12 @@ class Summary(BaseModel):
     metrics: list[Metric]
     latency_ms: list[int]
     times: list[str]
+
+
+class User(BaseModel):
+    username: str
+
+
+class AccessToken(BaseModel):
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"

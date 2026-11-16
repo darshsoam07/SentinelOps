@@ -32,7 +32,7 @@ class PaymentStore:
             if self.error_attempts % 2:
                 reason, code = "Simulated processing error", 500
         if faults.high_latency:
-            await asyncio.sleep(0.8)
+            await asyncio.sleep(0.82)
         payment = Payment(
             **request.model_dump(),
             id=uuid4(),

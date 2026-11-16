@@ -76,3 +76,12 @@ class DatabaseIncidents:
             )
             self.append(conn, event)
             return incident
+
+    def save(self, incident: Incident):
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO incidents VALUES (:id, CAST(:record AS jsonb)) ON CONFLICT (id) DO UPDATE SET record=CAST(:record AS jsonb)"
+                ),
+                dict(id=incident.id, record=incident.model_dump_json()),
+            )

@@ -1,0 +1,11 @@
+groups:
+  - name: payflow
+    rules:
+      - alert: PayFlowPaymentErrors
+        expr: sum(increase(http_requests_total{job="payflow",method="POST",route=~"(/api/v1)?/(payments|submit)",status=~"5.."}[30s])) > 0
+        labels: {severity: high}
+        annotations: {summary: PayFlow payment requests are failing}
+      - alert: PayFlowPaymentLatency
+        expr: histogram_quantile(0.95, sum by(le)(rate(http_request_duration_seconds_bucket{job="payflow",method="POST",route=~"(/api/v1)?/(payments|submit)"}[30s]))) > 0.5
+        labels: {severity: high}
+        annotations: {summary: PayFlow payment p95 exceeds half a second}

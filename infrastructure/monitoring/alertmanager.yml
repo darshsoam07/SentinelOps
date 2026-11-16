@@ -1,0 +1,14 @@
+route:
+  receiver: sentinelops
+  group_by: [alertname]
+  group_wait: 1s
+  group_interval: 5s
+  repeat_interval: 1h
+receivers:
+  - name: sentinelops
+    webhook_configs:
+      - url: http://ops-api:8000/internal/alerts
+        send_resolved: true
+        http_config:
+          authorization:
+            credentials_file: /run/secrets/alert_token

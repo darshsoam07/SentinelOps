@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+scrape_configs:
+  - job_name: ops
+    static_configs:
+      - targets: ['ops-api:8000']
+  - job_name: payflow
+    static_configs:
+      - targets: ['pay-api:8000']
+rule_files: [/etc/prometheus/payflow.yml]
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']

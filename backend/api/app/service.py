@@ -35,6 +35,9 @@ class IncidentStore:
         self.audit.insert(0, incident_decision(incident, request, approved))
         return incident
 
+    def save(self, incident: Incident):
+        self.incidents[incident.id] = incident
+
 
 def incident_decision(incident: Incident, request: Decision, approved: bool) -> Audit:
     action = next((a for a in incident.actions if a.id == request.action_id), None)
