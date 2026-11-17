@@ -1,21 +1,22 @@
 import os
 from app.services.telemetry import readings
-from fastapi import APIRouter, Query
-from app.schemas.incidents import Audit, Decision, Incident, Summary
+from fastapi import APIRouter, Depends, Query
+from app.api.dependencies import current_user
+from datetime import UTC, datetime
+from app.schemas.incidents import Audit, Decision, Event, EvidenceSnapshot, Incident, Summary
 from app.seed import METRICS, LATENCY_MS, TIMES
 from app.services.incidents import IncidentStore
 
 router = APIRouter()
-from app.db.database import get_db
-from fastapi import Depends
-from app.api.dependencies import current_user
+from app.db.database import engine
 from app.db.repository import DatabaseIncidents
+from app.services.incidents import IncidentStore
 
-store = IncidentStore()
+store = DatabaseIncidents(engine) if engine is not None else IncidentStore()
 
 
-async def repository(session=Depends(get_db)):
-    return DatabaseIncidents(session) if session is not None else store
+def repository():
+    return store
 
 
 @router.get("/incidents")
@@ -69,3 +70,34 @@ async def summary(repo=Depends(repository)) -> Summary:
         latency_ms=LATENCY_MS,
         times=TIMES,
     )
+
+
+@router.post("/incidents/{id}/verify")
+async def verify_incident(
+    id: str,
+    evidence: EvidenceSnapshot,
+    repo=Depends(repository),
+) -> Incident:
+    if hasattr(repo, "detail"):
+        incident = await repo.detail(id)
+    else:
+        incident = repo.get(id)
+    now = datetime.now(UTC)
+
+    # Verification criteria: at least 5 submissions, 0 server errors, p95 <= 2.0s
+    if (
+        evidence.submissions_total >= 5
+        and evidence.failures_total == 0
+        and (evidence.latency_p95_s is None or evidence.latency_p95_s <= 2.0)
+    ):
+        incident.verified_restored_at = now
+        incident.status = "Resolved"
+        incident.evidence_source = evidence.source
+        incident.timeline.append(
+            Event(time=now, kind="Verification", title="Recovery verified with healthy traffic")
+        )
+        if hasattr(repo, "save"):
+            res = repo.save(incident)
+            if hasattr(res, "__await__"):
+                await res
+    return incident

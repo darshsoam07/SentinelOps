@@ -1,4 +1,11 @@
-from .schemas import Action, Event, Evidence, Incident, Investigation, Metric
+from app.schemas.incidents import (
+    Action,
+    Event,
+    Evidence,
+    Incident,
+    Investigation,
+    Metric,
+)
 
 
 def stamp(minute: int) -> str:
@@ -99,3 +106,6 @@ METRICS = [
         ("p99 latency", "5.1 s"),
     ]
 ]
+
+LATENCY_MS = [180, 210, 195, 260, 480, 930, 1470, 2110, 3070, 3850, 4200]
+TIMES = [f"10:{i:02}" for i in range(20, 31)]

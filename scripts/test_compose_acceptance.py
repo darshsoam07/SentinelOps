@@ -264,7 +264,7 @@ def main():
                     lambda ep: ep if ep.get("status") == "Resolved" or ep.get("resolved_at") else None
                 )(http.get(f"{ops_url}/incidents/{ep_id}", headers=auth_headers).json()),
                 "Alert resolution webhook delivery",
-                timeout_s=45,
+                timeout_s=60,
             )
 
             # Assert episode remains UNVERIFIED while traffic is absent

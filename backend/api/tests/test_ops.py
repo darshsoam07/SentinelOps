@@ -1,5 +1,5 @@
 import pytest
-from app import routes
+from app.api.routers import incidents as routes
 
 path = "/incidents/SNT-001"
 

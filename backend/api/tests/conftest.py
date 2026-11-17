@@ -1,16 +1,17 @@
 import pytest
 from fastapi.testclient import TestClient
-from app import routes
+from app.api.routers import incidents as routes
 from app.main import app
-from app.service import IncidentStore
-from app.alerts import IncidentLifecycle
+from app.services.incidents import IncidentStore
 from app.api.dependencies import current_user
 
 
 @pytest.fixture
 def client(monkeypatch):
-    monkeypatch.setattr(routes, "store", IncidentStore())
-    monkeypatch.setattr(routes, "lifecycle", IncidentLifecycle())
+    new_store = IncidentStore()
+    monkeypatch.setattr(routes, "store", new_store)
+    from app import routes as root_routes
+    monkeypatch.setattr(root_routes, "store", new_store)
     app.dependency_overrides[current_user] = lambda: "test-operator"
     with TestClient(app) as client:
         yield client

@@ -1,15 +1,18 @@
+import {Ledger} from "../ReceiptLedger";
+import { useCreatePayment, usePayments } from "../hooks/usePayments";
 import { useState } from "react";
 import { api } from "../services/api";
 import type { Fault, Payment } from "../types";
-import { Panel, State, Badge, useResource, utc } from "../common";
+import { Panel, State, useResource } from "../common";
 const labels: Record<Fault, string> = {
   high_latency: "High latency",
   high_error_rate: "High error rate",
   database_unavailable: "Database unavailable",
 };
-export default function Payflow() {
-  const payments = useResource(api.payments),
-    faults = useResource(api.faults);
+export default function Payflow({embedded=false}:{embedded?:boolean}) {
+  const creation = useCreatePayment();
+  const payments = usePayments(),
+    faults = useResource(api.faults, "faults");
   const [amount, setAmount] = useState("500"),
     [currency, setCurrency] = useState("INR"),
     [id, setId] = useState("");
@@ -29,22 +32,28 @@ export default function Payflow() {
   }
   return (
     <>
-      <h1>PayFlow traffic lab</h1>
+      <div className="dispatch">{embedded?<h2>Settlement terminal</h2>:<h1>PayFlow traffic lab</h1>}<small>// PAYFLOW_DISPATCH</small>
       <p className="subtitle">
         Submit test transactions and observe controlled service faults.
       </p>
-      {error && <p role="alert">{error}</p>}
+      {(error || creation.error) && (
+        <p role="alert">{error || creation.error?.message}</p>
+      )}
       <div className="columns">
         <Panel title="Test payment">
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              run(async () => {
-                const p = await api.submit(Number(amount), currency);
-                setResult(p);
-                setId(p.id);
-                payments.refresh();
-              });
+              creation.mutate(
+                { amount: Number(amount), currency },
+                {
+                  onSuccess: (p) => {
+                    setResult(p);
+                    setId(p.id);
+                    setError("");
+                  },
+                },
+              );
             }}
           >
             <label>
@@ -58,6 +67,7 @@ export default function Payflow() {
                 onChange={(e) => setAmount(e.target.value)}
               />
             </label>
+            <div className="presets">{[25,100,500,1000].map(n=><button type="button" key={n} onClick={()=>{setAmount(String(n));setCurrency("USD")}}>+${n.toLocaleString("en-US")}</button>)}</div>
             <label>
               Currency
               <input
@@ -68,8 +78,11 @@ export default function Payflow() {
                 onChange={(e) => setCurrency(e.target.value.toUpperCase())}
               />
             </label>
-            <button disabled={busy}>Submit payment</button>
+            <button disabled={busy || creation.isPending}>
+              Submit payment
+            </button>
           </form>
+          <small>IDEMPOTENCY SHIELD: ARMED · UI submit lock only</small>
         </Panel>
         <Panel title="Fault simulation">
           {faults.data ? (
@@ -80,7 +93,7 @@ export default function Payflow() {
                   role="switch"
                   aria-label={labels[k]}
                   aria-checked={faults.data![k]}
-                  disabled={busy}
+                  disabled={busy || creation.isPending}
                   onClick={() =>
                     run(async () =>
                       faults.setData(await api.toggle(k, !faults.data![k])),
@@ -114,7 +127,9 @@ export default function Payflow() {
               onChange={(e) => setId(e.target.value)}
             />
           </label>
-          <button disabled={busy}>Retrieve payment</button>
+          <button disabled={busy || creation.isPending}>
+            Retrieve payment
+          </button>
         </form>
         {result && (
           <pre aria-label="Payment response">
@@ -122,29 +137,17 @@ export default function Payflow() {
           </pre>
         )}
       </Panel>
-      <Panel title="Recent transactions">
+      </div><div className="ledgerpanel"><Panel title="Recent transactions">
         {payments.data ? (
           payments.data.length ? (
-            payments.data.map((p) => (
-              <div className="row" key={p.id}>
-                <div>
-                  <strong>
-                    {p.amount} {p.currency}
-                  </strong>
-                  <small>
-                    {p.id} / {utc(p.created_at)}
-                  </small>
-                </div>
-                <Badge>{p.status}</Badge>
-              </div>
-            ))
+            <Ledger rows={payments.data}/>
           ) : (
             <p>No transactions yet.</p>
           )
         ) : (
           <State error={payments.error} retry={payments.refresh} />
         )}
-      </Panel>
+      </Panel></div>
     </>
   );
 }

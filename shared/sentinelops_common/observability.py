@@ -55,6 +55,4 @@ def instrument(app, engine):
 
     @app.get("/metrics")
     async def metrics():
-        return Response(
-            generate_latest(registry), headers={"Content-Type": CONTENT_TYPE_LATEST}
-        )
+        return Response(generate_latest(registry), media_type=CONTENT_TYPE_LATEST)

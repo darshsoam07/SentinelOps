@@ -31,18 +31,25 @@ async def readings(url):
         for t, v in (series[0]["values"] if series else [])
         if math.isfinite(float(v))
     ]
+    rate_val = float(rate[0]["value"][1]) if rate else 0.0
+    error_val = float(errors[0]["value"][1]) if errors else 0.0
+
+    if not rate or rate_val == 0.0:
+        error_display = "Idle (no traffic)"
+    else:
+        error_display = f"{(error_val / rate_val * 100):.1f}%" if error_val > 0 else "0.0%"
+
     metrics = [
         {
-            "name": name,
-            "value": format(float(result[0]["value"][1]), ".2f") + " /s"
-            if result
-            else "—",
-        }
-        for name, result in [("Request rate", rate), ("Server error rate", errors)]
+            "name": "Request rate",
+            "value": format(rate_val, ".2f") + " /s" if (rate and rate_val > 0) else "Idle (no traffic)",
+        },
+        {
+            "name": "Server error rate",
+            "value": error_display,
+        },
+        {"name": "p95 latency", "value": f"{points[-1][1]} ms" if points else "—"},
     ]
-    metrics.append(
-        {"name": "p95 latency", "value": f"{points[-1][1]} ms" if points else "—"}
-    )
     return dict(
         metrics=metrics,
         latency_ms=[v for _, v in points],

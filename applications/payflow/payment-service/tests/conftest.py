@@ -1,8 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
-from app import routes
+from app.api.routers import payments as routes
 from app.main import app
-from app.service import PaymentStore
+from app.services.payments import PaymentStore
 from app.api.dependencies import current_user
 
 

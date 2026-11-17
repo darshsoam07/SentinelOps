@@ -29,6 +29,8 @@ The full workflow runs from observing a failure through detecting and correlatin
 | Payment traffic | Submit a positive amount and three-letter uppercase currency. Retrieve the resulting UUID receipt, including failed attempts. |
 | Controlled faults | Add 800 ms of latency, fail the first and every other eligible payment with HTTP 500, or simulate a database outage with HTTP 503. |
 | Persistence | Restart the APIs with PostgreSQL configured and retrieve the original receipt and decision. Each service owns its database and migrations. |
+| Live incident lifecycle | Alertmanager delivers firing and resolved alerts via webhooks. Firing alerts create persisted episodes (`ALT-*`) with Prometheus evidence snapshots. Resolution requires verified healthy traffic before marking restored. |
+| Compose acceptance | Automated end-to-end acceptance test (`scripts/test_compose_acceptance.py`) gates the complete stack in Docker Compose with disposable credentials, ports, and volumes. |
 
 ## Main demonstration · Payment Service Performance Regression (SNT-001)
 
@@ -37,7 +39,13 @@ The full workflow runs from observing a failure through detecting and correlatin
 3. Open **Approvals**. Review the rollback, restart and scaling recommendations, then decide one action. Refresh the page and find its action ID in the audit trail. Execution stays unexecuted and the incident remains investigating.
 4. Open **PayFlow lab**. Submit a payment, enable **Database unavailable**, and submit again. Retrieve the failed receipt by ID. Disable the fault and submit once more to observe a successful payment. These requests exercise PayFlow independently of the seeded incident.
 
-[Incident fixture](backend/api/app/seed.py) · [Decision policy](backend/api/app/service.py) · [Payment fault behavior](applications/payflow/payment-service/app/service.py)
+### Seeded Demo vs Live PayFlow Incidents
+
+SentinelOps cleanly separates two incident models:
+- **Seeded Demo (`SNT-001`)**: A fixed, deterministic scenario designed to demonstrate human operator decision-making, hypothesis review, alternative root cause analysis, runbook evaluation, and audit logging.
+- **Live PayFlow Episodes (`ALT-*`)**: Dynamic incidents triggered by live telemetry when faults are injected into PayFlow. Prometheus scrapes `/metrics`, evaluates alert rules, and sends webhook notifications to SentinelOps via Alertmanager. SentinelOps derives deterministic episode IDs (`ALT-<hash>`), tracks the episode lifecycle from `Investigating` to `Resolving`, and enforces rigorous recovery criteria (at least 5 successful payment submissions, 0 failures, and p95 latency ≤ 2.0s) before marking the incident `Resolved`.
+
+[Incident fixture](backend/api/app/seed.py) · [Decision policy](backend/api/app/services/incidents.py) · [Payment fault behavior](applications/payflow/payment-service/app/services/payments.py)
 
 ## Architecture
 
@@ -50,14 +58,18 @@ flowchart TB
 
     O --> IS[Incident Store]
     O --> AU[Audit Store]
-    O --> SE[Seeded Incident Scenario]
+    O --> SE[Seeded Demo SNT-001]
 
     P --> PS[Payment Store]
     P --> FS[Fault Simulator]
 
-    IS -. optional persistence .-> DB1[(SentinelOps PostgreSQL)]
-    AU -. optional persistence .-> DB1
-    PS -. optional persistence .-> DB2[(PayFlow PostgreSQL)]
+    PROM[Prometheus :9090] -- scrapes metrics --> P
+    PROM -- evaluates alert rules --> AM[Alertmanager :9093]
+    AM -- firing / resolved webhooks --> O
+
+    IS -. persistence .-> DB1[(SentinelOps PostgreSQL)]
+    AU -. persistence .-> DB1
+    PS -. persistence .-> DB2[(PayFlow PostgreSQL)]
 ```
 
 The browser calls each API independently. PostgreSQL mode commits the decision, timeline change and audit entry in one transaction under a row lock. PayFlow stores each completed payment attempt separately. [Architecture notes](docs/architecture.md) · [Dashboard HTTP client](dashboard/src/services/api.ts)
@@ -136,7 +148,7 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 
 python -m pip install \
-  -r backend/api/requirements-dev.txt \
+  -e ./shared -r backend/api/requirements-dev.txt \
   -r applications/payflow/payment-service/requirements-dev.txt
 ```
 
@@ -150,6 +162,17 @@ npm ci
 test -f .env || cp .env.example .env
 ```
 
+### Configure operator sign-in
+
+From the repository root, run the setup once and choose your operator password.
+
+```bash
+cd ~/sentinelops
+.venv/bin/python scripts/setup-auth.py
+```
+
+The script writes an Argon2 password hash and a random JWT signing secret to a private, Git-ignored file. Source it in **both API terminals** before starting Uvicorn. Sign in at the dashboard as `operator`. Each login lasts 15 minutes. The dashboard keeps the token in localStorage across reloads. Signing out or receiving HTTP 401 clears it and returns the operator to /login.
+
 ## Starting all three applications
 
 Open three Ubuntu terminals.
@@ -160,6 +183,7 @@ Open three Ubuntu terminals.
 cd ~/sentinelops/applications/payflow/payment-service
 
 source ~/sentinelops/.venv/bin/activate
+source ~/sentinelops/.env.auth
 
 uvicorn app.main:app --reload --port 8001
 ```
@@ -170,6 +194,7 @@ uvicorn app.main:app --reload --port 8001
 cd ~/sentinelops/backend/api
 
 source ~/sentinelops/.venv/bin/activate
+source ~/sentinelops/.env.auth
 
 uvicorn app.main:app --reload --port 8000
 ```
@@ -236,6 +261,8 @@ The setup script runs `alembic upgrade head` from each API directory using the r
 
 ## API reference
 
+Business routes in the tables below are available under `/api/v1` and at their original paths. Both require the same bearer token. Health checks are public. Use the SentinelOps Swagger **Authorize** control or POST form fields `username` and `password` to `/api/v1/auth/login` on port 8000. Send the returned token in `Authorization: Bearer <token>` to either API. `GET /api/v1/users/me` returns the signed-in operator.
+
 ### SentinelOps API — Port 8000
 
 | Method | Endpoint | Purpose |
@@ -291,6 +318,25 @@ npm test
 
 npm run build
 ```
+
+### Live Compose acceptance test
+
+Verify the full deployed path through PayFlow, Prometheus, Alertmanager, SentinelOps, and PostgreSQL:
+
+```bash
+python scripts/test_compose_acceptance.py
+```
+
+This test:
+1. Spawns an isolated Docker Compose project with disposable credentials, ports, and volumes.
+2. Waits for API readiness and healthy Prometheus scrape targets.
+3. Authenticates an operator and submits a healthy payment.
+4. Injects a fault (`database_unavailable`) and drives traffic until Alertmanager delivers a firing webhook.
+5. Verifies a new episode (`ALT-*`) is created with Prometheus metrics evidence snapshots.
+6. Clears the fault and confirms the episode remains unverified while traffic is absent.
+7. Submits healthy payments to satisfy recovery criteria (≥5 submissions, 0 failures, p95 ≤ 2.0s) and asserts the episode reaches verified recovery.
+8. Restarts the Ops API and asserts the episode identity, verified state, evidence, and timestamps survived.
+9. Tears down all test resources and cleans up volumes.
 
 ### End-to-end browser tests
 
@@ -351,14 +397,14 @@ SentinelOps/
 The current application is a local development and demonstration project.
 
 - Do not expose the APIs directly to the public internet.
-- The current approval interface is not an authentication system.
-- Operator identity is a demonstration label.
+- Authentication supports one configured operator.
+- New decisions record the authenticated username. Existing audit records retain their original actor label.
 - Fault switches are process-local.
 - The incident and reliability scenario is seeded.
 - Approved actions are not executed against Kubernetes.
 - Do not use production payment or infrastructure data.
 
-Restricted recovery execution, proper authentication and authorization, and production-grade security controls belong to future milestones.
+Role-based authorization, managed identity and restricted recovery execution are future milestones.
 
 Investigation uses deterministic fixture data and makes no LLM calls. Live OpenTelemetry ingestion, Prometheus, Grafana, Loki and Tempo integration, automatic incident detection and Kubernetes self-healing are pending. Approval records a decision without executing or verifying infrastructure changes.
 
@@ -388,3 +434,19 @@ Before proposing a change:
 ## License
 
 Licensed under the [MIT License](LICENSE).
+
+## Docker Compose
+
+Create a root `.env` with independent URL-safe `OPS_DB_PASSWORD`, `PAY_DB_PASSWORD`, `ALERT_WEBHOOK_TOKEN` and `GRAFANA_PASSWORD` values (for example, random hex). Run `python scripts/setup-auth.py` if needed. In a private `.env.docker`, copy the three assignments from `.env.auth` without the leading `export ` and single-quote the values to preserve the Argon2 hash. Run:
+
+```sh
+docker compose --env-file .env --env-file .env.docker up --build -d
+```
+
+Open http://localhost:8080. Each API migrates its own database before serving requests. Both APIs expose `/health`, `/ready` and Prometheus counters at `/metrics`. Payments and audit lists return the latest 50 records by default (`?limit=1` through `100`). Login allows ten attempts per minute per client address per API process. Both services currently trust the same HS256 key.
+
+Grafana at http://localhost:3000 provisions the SentinelOps service health dashboard. Prometheus scrapes both APIs every five seconds. The overview reads PayFlow request rate, server error rate and p95 latency from Prometheus. A firing payment-error or high-latency alert creates one incident per fingerprint and firing episode. Local launches without Prometheus use labelled seed data.
+
+The login limiter uses the ASGI client address, per process, per client address. Multiple workers have independent quotas. Configure Uvicorn's forwarded-header trust only for known reverse proxy addresses. The metrics endpoints are unauthenticated. Keep the API listeners on loopback or a private network and exclude /metrics from public reverse-proxy routes.
+
+[Local fault detection trials, clock definition and reproduction commands](docs/detection-trials.md)

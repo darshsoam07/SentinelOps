@@ -388,3 +388,10 @@ button{transition:transform 120ms ease-out,background-color 120ms ease-out}butto
 @media(max-width:800px){aside{gap:16px;flex-wrap:wrap}.local{display:none}.columns{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:640px){aside{display:block;padding-top:14px}.brand{margin-bottom:8px}nav{gap:6px}nav a{min-height:44px}.metrics div:nth-child(3n+1){padding-left:0}.incident-row{padding:12px;gap:8px}.content{padding-top:20px}.metric-heading{flex-wrap:wrap}.incident-row svg{flex-shrink:0}}
 @media(prefers-reduced-motion:reduce){button,.incident-row svg{transition:none!important;transform:none!important}}
+
+.login-page { min-height:100svh; display:grid; place-items:center; padding:24px; }
+.login-panel { width:min(100%,420px); padding:clamp(20px,4vw,36px); background:var(--surface); border:1px solid var(--line); border-radius:8px; }
+.login-panel h1 { font-size:32px; margin:0 0 24px; }
+.login-panel [role=status] { color:var(--amber); margin-bottom:16px; }
+.login-panel form { gap:18px; }
+.login-panel button { justify-self:stretch; }

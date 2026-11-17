@@ -1,3 +1,4 @@
+import Session from "./Session";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, NavLink, Route, Routes } from "react-router-dom";
 import {
@@ -8,7 +9,8 @@ import {
   ArrowLeftRight,
   Server,
 } from "lucide-react";
-import Overview from "./pages/Overview";
+import SentinelOpsDashboard, {CommandBar} from "./SentinelOpsDashboard";
+import "./command.css";
 import { Incidents, Detail } from "./pages/Incidents";
 import Approvals from "./pages/Approvals";
 import Payflow from "./pages/Payflow";
@@ -41,11 +43,10 @@ function App() {
           Local simulation
         </div>
       </aside>
-      <main>
-
+      <main><CommandBar/>
         <div className="content">
           <Routes>
-            <Route path="/" element={<Overview />} />
+            <Route path="/" element={<SentinelOpsDashboard />} />
             <Route path="/incidents" element={<Incidents />} />
             <Route path="/incidents/:id" element={<Detail />} />
             <Route path="/approvals" element={<Approvals />} />
@@ -59,7 +60,8 @@ function App() {
           </Routes>
         </div>
         <footer>
-          Local simulation. Recovery decisions are recorded without executing infrastructure changes.
+          Local simulation. Recovery decisions are recorded without executing
+          infrastructure changes.
         </footer>
       </main>
     </div>
@@ -67,6 +69,8 @@ function App() {
 }
 createRoot(document.getElementById("root")!).render(
   <BrowserRouter>
-    <App />
+    <Session>
+      <App />
+    </Session>
   </BrowserRouter>,
 );

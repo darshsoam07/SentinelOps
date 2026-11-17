@@ -4,8 +4,7 @@ from pwdlib import PasswordHash
 from app.api.dependencies import current_user
 from app.core.config import settings
 from app.core.security import issue_token
-from app.schemas import AccessToken, User
-
+from app.schemas.user import AccessToken, User
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -30,6 +29,7 @@ def login(request: Request, form: OAuth2PasswordRequestForm = Depends()) -> Acce
     return AccessToken(access_token=issue_token(form.username))
 
 
-@router.get("/users/me", tags=["Users"])
-async def me(username: str = Depends(current_user)) -> User:
+@router.get("/auth/user", tags=["Authentication"])
+@router.get("/users/me", tags=["Authentication"])
+def user(username: str = Depends(current_user)) -> User:
     return User(username=username)

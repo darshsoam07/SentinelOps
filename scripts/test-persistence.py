@@ -1,6 +1,9 @@
 """Exercise real HTTP processes twice in disposable PostgreSQL schemas."""
 
 import os
+import secrets
+import jwt
+from datetime import UTC, datetime, timedelta
 import socket
 import subprocess
 import sys
@@ -17,6 +20,51 @@ from sqlalchemy.engine import make_url
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def verify_incident_migration(directory, env, url):
+    def migrate(command, revision):
+        subprocess.run(
+            [sys.executable, "-m", "alembic", command, revision],
+            cwd=directory,
+            env=env,
+            check=True,
+        )
+
+    migrate("upgrade", "0001")
+    engine = create_engine(url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text("""INSERT INTO incidents(id, record) VALUES
+                ('upgrade-fixture', '{"status":"Open","severity":"Low"}')""")
+            )
+        migrate("upgrade", "0002")
+        with engine.begin() as connection:
+            query = text(
+                "SELECT status, severity FROM incidents WHERE id='upgrade-fixture'"
+            )
+            assert tuple(connection.execute(query).one()) == ("Open", "Low")
+            connection.execute(
+                text("""UPDATE incidents SET record='{"status":"Resolved","severity":"High"}'
+                WHERE id='upgrade-fixture'""")
+            )
+            assert tuple(connection.execute(query).one()) == ("Resolved", "High")
+        migrate("downgrade", "0001")
+        with engine.begin() as connection:
+            assert set(
+                connection.execute(text("SELECT * FROM incidents LIMIT 0")).keys()
+            ) == {"id", "record"}
+            assert (
+                connection.execute(
+                    text(
+                        "DELETE FROM incidents WHERE id='upgrade-fixture' RETURNING record"
+                    )
+                ).scalar()["status"]
+                == "Resolved"
+            )
+    finally:
+        engine.dispose()
+
+
 @contextmanager
 def database(name, directory):
     variable = name + "_DATABASE_URL"
@@ -30,11 +78,18 @@ def database(name, directory):
         env = dict(
             os.environ, **{variable: test_url.render_as_string(hide_password=False)}
         )
+        if name == "SENTINELOPS":
+            verify_incident_migration(directory, env, test_url)
         subprocess.run(
             [sys.executable, "-m", "alembic", "upgrade", "head"],
             cwd=directory,
             env=env,
             check=True,
+        )
+        env[variable] = url.render_as_string(hide_password=False)
+        env["PG_TEST_SCHEMA"] = schema
+        env["PYTHONPATH"] = (
+            str(ROOT / "scripts") + os.pathsep + env.get("PYTHONPATH", "")
         )
         yield env
     finally:
@@ -53,7 +108,8 @@ def server(directory, env):
             sys.executable,
             "-m",
             "uvicorn",
-            "app.main:app",
+            "persistence_app:build",
+            "--factory",
             "--port",
             str(port),
             "--log-level",
@@ -63,7 +119,22 @@ def server(directory, env):
         env=env,
     )
     try:
-        with httpx.Client(base_url=f"http://127.0.0.1:{port}") as client:
+        now = datetime.now(UTC)
+        token = jwt.encode(
+            dict(
+                sub="operator",
+                iss="sentinelops",
+                aud="sentinelops-workspace",
+                iat=now,
+                exp=now + timedelta(minutes=5),
+            ),
+            env["SENTINELOPS_JWT_SECRET"],
+            algorithm="HS256",
+        )
+        with httpx.Client(
+            headers={"Authorization": "Bearer " + token},
+            base_url=f"http://127.0.0.1:{port}",
+        ) as client:
             for _ in range(100):
                 if process.poll() is not None:
                     raise RuntimeError("API exited during startup")
@@ -75,6 +146,11 @@ def server(directory, env):
                 time.sleep(0.1)
             else:
                 raise RuntimeError("API startup timed out")
+            assert client.get("/ready").json() == {
+                "status": "ready",
+                "storage": "postgresql",
+            }
+            assert "http_requests_total" in client.get("/metrics").text
             yield client
     finally:
         process.terminate()
@@ -87,12 +163,16 @@ def main():
     with ExitStack() as stack:
         ops_env = stack.enter_context(database("SENTINELOPS", ops))
         pay_env = stack.enter_context(database("PAYFLOW", pay))
+        ops_env["SENTINELOPS_JWT_SECRET"] = pay_env["SENTINELOPS_JWT_SECRET"] = (
+            secrets.token_hex(32)
+        )
         with server(pay, pay_env) as client:
             response = client.post("/payments", json={"amount": 501, "currency": "INR"})
             assert response.status_code == 201
             receipt = response.json()
         with server(pay, pay_env) as client:
             assert client.get("/payments/" + receipt["id"]).json() == receipt
+            assert client.get("/payments?limit=1").json() == [receipt]
         with server(ops, ops_env) as client:
 
             def approve(_):
@@ -107,6 +187,8 @@ def main():
             assert incident["actions"][0]["status"] == "Approved"
             assert incident["timeline"][-1]["kind"] == "Approval"
             assert len(client.get("/audit-logs").json()) == 2
+            assert len(client.get("/audit-logs?limit=1").json()) == 1
+            assert client.get("/metrics/summary").json()["active"] == 1
     print(
         "PASS: migrations, payment restart, concurrent decision, audit and timeline restart"
     )

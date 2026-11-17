@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../services/api";
 import { Panel, Badge, State, useResource, utc } from "../common";
 export function Incidents() {
-  const q = useResource(api.incidents),
+  const q = useResource(api.incidents,"incidents"),
     [severity, setSeverity] = useState("All"),
     [status, setStatus] = useState("All");
   const rows = q.data?.filter(
@@ -69,7 +69,7 @@ export function Incidents() {
 }
 export function Detail() {
   const { id = "" } = useParams(),
-    q = useResource(useCallback(() => api.incident(id), [id])),
+    q = useResource(useCallback(() => api.incident(id), [id]), "incident/"+id),
     i = q.data;
   if (!i) return <State error={q.error} retry={q.refresh} />;
   const inv = i.investigation;

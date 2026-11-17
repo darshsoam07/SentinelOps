@@ -44,3 +44,28 @@ def test_fault(client, fault, expected):
             assert time.monotonic() - start >= 0.8
         if fault == "high_error_rate" and enabled:
             assert client.post("/payments", json=payload).status_code == 201
+
+
+def test_bounded_recent_payments(client):
+    for amount in range(1, 5):
+        assert (
+            client.post(
+                "/payments", json={"amount": amount, "currency": "USD"}
+            ).status_code
+            == 201
+        )
+    assert [p["amount"] for p in client.get("/payments?limit=2").json()] == [4, 3]
+    assert client.get("/payments?limit=101").status_code == 422
+    assert client.get("/ready").json()["storage"] == "memory"
+    assert "http_requests_total" in client.get("/metrics").text
+
+
+def test_receipt_metrics_use_route_template(client):
+    from uuid import uuid4
+
+    unknown = str(uuid4())
+    assert client.get("/api/v1/payments/" + unknown).status_code == 404
+    metrics = client.get("/metrics").text
+    assert 'route="/payments/{id}"' in metrics
+    assert unknown not in metrics
+    assert "http_request_duration_seconds_bucket" in metrics

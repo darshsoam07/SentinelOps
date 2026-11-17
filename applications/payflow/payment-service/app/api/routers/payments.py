@@ -1,16 +1,16 @@
+import time
 from itertools import islice
-from fastapi import Query
 from uuid import UUID
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from app.api.dependencies import current_user
+from app.db.database import get_db
+from app.db.repository import PaymentRepository
+from app.metrics import PaymentMetrics
 from app.schemas.payments import FaultChange, Faults, Payment, PaymentInput
 from app.services.payments import PaymentStore
 
 router = APIRouter()
-from app.db.database import get_db
-from fastapi import Depends
-from app.api.dependencies import current_user
-from app.db.repository import PaymentRepository
-
+metrics = PaymentMetrics()
 store = PaymentStore()
 
 
@@ -22,9 +22,27 @@ store = PaymentStore()
 async def create_payment(
     request: PaymentInput, response: Response, session=Depends(get_db)
 ) -> Payment:
+    start = time.monotonic()
     payment, response.status_code = await store.create(
         request, PaymentRepository(session) if session else None
     )
+    metrics.record(status_code=response.status_code, duration_s=time.monotonic() - start)
+    return payment
+
+
+@router.post(
+    "/submit",
+    status_code=201,
+    responses={500: {"model": Payment}, 503: {"model": Payment}},
+)
+async def submit_payment(
+    request: PaymentInput, response: Response, session=Depends(get_db)
+) -> Payment:
+    start = time.monotonic()
+    payment, response.status_code = await store.create(
+        request, PaymentRepository(session) if session else None
+    )
+    metrics.record(status_code=response.status_code, duration_s=time.monotonic() - start)
     return payment
 
 
@@ -57,3 +75,9 @@ async def faults() -> Faults:
 @router.post("/simulation/faults")
 async def change_fault(change: FaultChange) -> Faults:
     return store.change(change)
+
+
+@router.get("/metrics/payments")
+async def payment_metrics() -> dict:
+    """Submission metrics snapshot. Reads are excluded."""
+    return metrics.snapshot()

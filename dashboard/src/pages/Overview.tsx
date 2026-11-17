@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 import { Activity, ArrowUpRight } from "lucide-react";
 import { api } from "../services/api";
-import { Panel, State, useResource, Badge, utc } from "../common";
+import { Panel, State, useResource, Badge, utc, formatFailureRate } from "../common";
 function Health({ name, read }: { name: string; read: typeof api.opsHealth }) {
-  const check = useResource(read);
+  const check = useResource(read,name);
   return (
     <div className="row">
       <span>{name}</span>
@@ -18,13 +18,13 @@ function Health({ name, read }: { name: string; read: typeof api.opsHealth }) {
   );
 }
 export default function Overview() {
-  const s = useResource(api.summary),
-    incidents = useResource(api.incidents),
-    payments = useResource(api.payments);
+  const s = useResource(api.summary,"summary"),
+    incidents = useResource(api.incidents,"incidents"),
+    payments = useResource(api.payments,"payments");
   const m = s.data;
   return (
     <>
-      <h1>Operations overview</h1>
+      <h2>Incident inspector</h2>
       <section className="incident-focus" aria-label="Recent incident activity">
         {incidents.data ? (
           incidents.data.map((i) => (
@@ -46,21 +46,35 @@ export default function Overview() {
           <State error={incidents.error} retry={incidents.refresh} />
         )}
       </section>
+      {incidents.data?.find(i=>i.id==="SNT-001")?.timeline.map((e,index)=><div className="eventline" key={index}><time>{utc(e.time)}</time>{e.title}</div>)}
       {m ? (
         <>
-          <h2 className="metric-heading">Reliability indicators <small>Seeded incident window</small></h2>
+          <h2 className="metric-heading">Reliability indicators <small>{m.source}</small></h2>
           <div className="metrics">
-            {m.metrics.map((x) => (
-              <div key={x.name}>
-                <small>{x.name}</small>
-                <strong>{x.value}</strong>
-              </div>
-            ))}
+            {m.metrics.map((x) => {
+              const isErrorRate =
+                x.name === "Error rate" || x.name === "Server error rate";
+              let displayVal = x.value;
+              if (
+                isErrorRate &&
+                payments.data &&
+                payments.data.length === 0 &&
+                (x.value === "0.00 /s" || x.value === "0.0%" || x.value === "0%")
+              ) {
+                displayVal = "Idle (no traffic)";
+              }
+              return (
+                <div key={x.name}>
+                  <small>{x.name}</small>
+                  <strong>{displayVal}</strong>
+                </div>
+              );
+            })}
           </div>
           <div className="columns">
             <Panel
               title="Payment latency"
-              meta={<Badge>Seeded scenario</Badge>}
+              meta={<Badge>{m.source}</Badge>}
             >
               <div className="latency-reading">{m.metrics.find(metric => metric.name === "p95 latency")?.value}<small>95th percentile</small></div>
               <div className="chart">
@@ -73,7 +87,7 @@ export default function Overview() {
                   viewBox="0 0 600 130"
                   preserveAspectRatio="none"
                   role="img"
-                  aria-label="Seeded p95 payment latency rising to 4.2 seconds"
+                  aria-label={m.source + " p95 payment latency"}
                 >
                   {[0, 65, 129].map((y) => (
                     <line
@@ -93,7 +107,7 @@ export default function Overview() {
                     points={m.latency_ms
                       .map((v, i) =>
                         [
-                          (i * 600) / (m.latency_ms.length - 1),
+                          (i * 600) / Math.max(1, m.latency_ms.length - 1),
                           130 - (v * 130) / 5000,
                         ].join(","),
                       )
@@ -129,10 +143,18 @@ export default function Overview() {
         meta={<Link to="/payflow">Open PayFlow</Link>}
       >
         {payments.data ? (
-          <p>
-            {payments.data.length} requests recorded /{" "}
-            {payments.data.filter((p) => p.status === "FAILED").length} failed
-          </p>
+          <>
+            <p>
+              {payments.data.length} requests recorded /{" "}
+              {payments.data.filter((p) => p.status === "FAILED").length} failed
+            </p>
+            <div className="row">
+              <span>Failure rate</span>
+              <b className={payments.data.some((p) => p.status === "FAILED") ? "failed" : ""}>
+                {formatFailureRate(payments.data)}
+              </b>
+            </div>
+          </>
         ) : (
           <State error={payments.error} retry={payments.refresh} />
         )}
